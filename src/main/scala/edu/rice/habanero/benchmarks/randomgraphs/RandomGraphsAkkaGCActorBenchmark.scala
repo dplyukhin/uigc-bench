@@ -26,7 +26,7 @@ object RandomGraphsAkkaGCActorBenchmark {
 
   private final class RandomGraphsAkkaGCActorBenchmark extends Benchmark {
     def initialize(args: Array[String]): Unit = {
-
+      AkkaActorState.initialize()
     }
 
     def printArgInfo(): Unit = {

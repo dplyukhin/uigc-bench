@@ -5,10 +5,6 @@ import akka.actor.typed.scaladsl.Behaviors
 import gc.{AbstractBehavior, ActorContext, ActorRef, AnyActorRef, Behavior, Message}
 
 
-/**
- *
- * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
- */
 abstract class AkkaGCActor[T](context: ActorContext[AkkaMsg[T]]) extends AbstractBehavior[AkkaMsg[T]](context) {
 
   private val startTracker = new AtomicBoolean(false)

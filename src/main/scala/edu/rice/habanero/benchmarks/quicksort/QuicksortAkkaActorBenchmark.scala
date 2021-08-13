@@ -55,7 +55,7 @@ object QuicksortAkkaActorBenchmark {
     def refs = Seq()
   }
   sealed trait QuicksortMsg extends Message with NoRefsMessage
-  abstract class Position extends QuicksortMsg
+  abstract class Position
   final case object PositionRight extends Position
   final case object PositionLeft extends Position
   final case object PositionInitial extends Position

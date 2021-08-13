@@ -114,7 +114,7 @@ object AkkaActorState {
   val actorLatch = new ModCountDownLatch(0)
 
   private val mailboxTypeKey = "actors.mailboxType"
-  private var config: Config = null
+  var config: Config = null
 
   def setPriorityMailboxType(value: String) {
     System.setProperty(mailboxTypeKey, value)
@@ -128,6 +128,8 @@ object AkkaActorState {
 
     val customConfigStr = """
     akka {
+      stdout-loglevel = "WARNING"
+      loglevel = "WARNING"
       log-dead-letters-during-shutdown = off
       log-dead-letters = off
 
