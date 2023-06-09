@@ -31,7 +31,7 @@ import java.io.{BufferedWriter, FileWriter}
   */
 
 object ClusterBenchmark {
-  def dumpMeasurements(iterationTimes: Iterable[Double], filename: String): Unit =
+  private def dumpMeasurements(iterationTimes: Iterable[Double], filename: String): Unit =
     if (filename == null) {
       println("ERROR: Missing filename. Dumping measurements to stdout.")
       for (time <- iterationTimes) println(time)
