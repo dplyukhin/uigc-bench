@@ -42,21 +42,21 @@ object Benchmark {
     }
 
   /** A benchmark with only one actor per system */
-  def SimpleBenchmark(
+  def apply[T](
       orchestratorBehavior: (
-          ActorRef[Benchmark.Protocol],
-          Map[String, ActorRef[Nothing]],
+          ActorRef[Benchmark.Protocol[T]],
+          Map[String, ActorRef[T]],
           Boolean
-      ) => Behavior[Nothing],
-      workerBehaviors: Map[String, Behavior[Nothing]]
-  ): Benchmark = {
+      ) => Behavior[T],
+      workerBehaviors: Map[String, Behavior[T]]
+  ): Benchmark[T] = {
     val workerBehaviors2 =
       for ((name, behavior) <- workerBehaviors) yield name -> Map(name -> behavior)
     def orchestratorBehavior2(
-        parentRef: ActorRef[Benchmark.Protocol],
-        workerNodes: Map[String, Map[String, ActorRef[Nothing]]],
+        parentRef: ActorRef[Benchmark.Protocol[T]],
+        workerNodes: Map[String, Map[String, ActorRef[T]]],
         isWarmup: Boolean
-    ): Behavior[Nothing] = {
+    ): Behavior[T] = {
       val workerRefs =
         for ((_, map) <- workerNodes; (name, ref) <- map) yield name -> ref
       orchestratorBehavior(parentRef, workerRefs, isWarmup)
@@ -67,28 +67,28 @@ object Benchmark {
     )
   }
 
-  trait Protocol
-  case class WorkerJoinedMessage(role: String, ref: ActorRef[Protocol]) extends Protocol
-  case class SpawnWorkerAck(role: String, ref: Map[String, ActorRef[Nothing]]) extends Protocol
-  case class ReceptionistListing(listing: Receptionist.Listing) extends Protocol
-  case object SpawnWorker extends Protocol
-  case object OrchestratorReady extends Protocol
-  case object OrchestratorDone extends Protocol
+  trait Protocol[+T]
+  case class WorkerJoinedMessage[T](role: String, ref: ActorRef[Protocol[T]]) extends Protocol[T]
+  case class SpawnWorkerAck[T](role: String, ref: Map[String, ActorRef[T]]) extends Protocol[T]
+  case class ReceptionistListing(listing: Receptionist.Listing) extends Protocol[Nothing]
+  case object SpawnWorker extends Protocol[Nothing]
+  case object OrchestratorReady extends Protocol[Nothing]
+  case object OrchestratorDone extends Protocol[Nothing]
 }
 
-class Benchmark(
+class Benchmark[T](
     orchestratorBehavior: (
-        ActorRef[Benchmark.Protocol],
-        Map[String, Map[String, ActorRef[Nothing]]],
+        ActorRef[Benchmark.Protocol[T]],
+        Map[String, Map[String, ActorRef[T]]],
         Boolean
-    ) => Behavior[Nothing],
-    workerBehaviors: Map[String, Map[String, Behavior[Nothing]]]
+    ) => Behavior[T],
+    workerBehaviors: Map[String, Map[String, Behavior[T]]]
 ) {
 
   import Benchmark._
 
   private val numWorkers = workerBehaviors.size
-  private val OrchestratorServiceKey = ServiceKey[Protocol]("ClusterBench")
+  private val OrchestratorServiceKey = ServiceKey[Protocol[T]]("ClusterBench")
 
   def runBenchmark(args: Array[String]): Unit =
     // Run them all on the same node
@@ -125,20 +125,20 @@ class Benchmark(
       .withFallback(ConfigFactory.load("application"))
 
     if (role == "orchestrator")
-      ActorSystem[Protocol](Orchestrator(), "ClusterSystem", config)
-    else ActorSystem[Protocol](Worker(role), "ClusterSystem", config)
+      ActorSystem[Protocol[T]](Orchestrator(), "ClusterSystem", config)
+    else ActorSystem[Protocol[T]](Worker(role), "ClusterSystem", config)
   }
 
   object Orchestrator {
 
-    def apply(): Behavior[Protocol] = Behaviors.setup[Protocol] { ctx =>
+    def apply(): Behavior[Protocol[T]] = Behaviors.setup[Protocol[T]] { ctx =>
       ctx.system.receptionist ! Receptionist.Register(OrchestratorServiceKey, ctx.self)
       waitForWorkerNodes(workerNodes = Map())
     }
 
     private def waitForWorkerNodes(
-        workerNodes: Map[String, ActorRef[Protocol]]
-    ): Behavior[Protocol] =
+        workerNodes: Map[String, ActorRef[Protocol[T]]]
+    ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case WorkerJoinedMessage(role, workerNode) =>
@@ -155,9 +155,9 @@ class Benchmark(
 
     private def waitForWorkers(
         iterationTimes: Seq[Double],
-        workerNodes: Map[String, ActorRef[Protocol]],
-        workers: Map[String, Map[String, ActorRef[Nothing]]]
-    ): Behavior[Protocol] =
+        workerNodes: Map[String, ActorRef[Protocol[T]]],
+        workers: Map[String, Map[String, ActorRef[T]]]
+    ): Behavior[Protocol[T]] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
           case SpawnWorkerAck(role, subworkers) =>
@@ -176,8 +176,8 @@ class Benchmark(
 
     private def waitForOrchestrator(
         iterationTimes: Seq[Double],
-        workerNodes: Map[String, ActorRef[Protocol]]
-    ): Behavior[Protocol] =
+        workerNodes: Map[String, ActorRef[Protocol[T]]]
+    ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case OrchestratorReady =>
@@ -189,8 +189,8 @@ class Benchmark(
     private def waitForIterationCompletion(
         startTime: Double,
         iterationTimes: Seq[Double],
-        workerNodes: Map[String, ActorRef[Protocol]]
-    ): Behavior[Protocol] =
+        workerNodes: Map[String, ActorRef[Protocol[T]]]
+    ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case OrchestratorDone =>
@@ -228,13 +228,13 @@ class Benchmark(
   }
 
   private object Worker {
-    def apply(role: String): Behavior[Protocol] = Behaviors.setup[Protocol] { ctx =>
+    def apply(role: String): Behavior[Protocol[T]] = Behaviors.setup[Protocol[T]] { ctx =>
       val adapter = ctx.messageAdapter[Receptionist.Listing](ReceptionistListing.apply)
       ctx.system.receptionist ! Receptionist.Subscribe(OrchestratorServiceKey, adapter)
       waitForOrchestrator(role)
     }
 
-    private def waitForOrchestrator(role: String): Behavior[Protocol] =
+    private def waitForOrchestrator(role: String): Behavior[Protocol[T]] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
           case ReceptionistListing(OrchestratorServiceKey.Listing(listings)) =>
@@ -250,8 +250,8 @@ class Benchmark(
 
     private def prepareForIteration(
         role: String,
-        orchestratorNode: ActorRef[Protocol]
-    ): Behavior[Protocol] =
+        orchestratorNode: ActorRef[Protocol[T]]
+    ): Behavior[Protocol[T]] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
           case SpawnWorker =>
