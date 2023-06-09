@@ -1,4 +1,5 @@
-package cluster
+package common
+
 import akka.actor.typed._
 import akka.actor.typed.receptionist.{Receptionist, ServiceKey}
 import akka.actor.typed.scaladsl.Behaviors
@@ -29,7 +30,7 @@ import java.io.{BufferedWriter, FileWriter}
   *      Part 2.
   */
 
-object Benchmark {
+object ClusterBenchmark {
   def dumpMeasurements(iterationTimes: Iterable[Double], filename: String): Unit =
     if (filename == null) {
       println("ERROR: Missing filename. Dumping measurements to stdout.")
@@ -44,24 +45,24 @@ object Benchmark {
   /** A benchmark with only one actor per system */
   def apply[T](
       orchestratorBehavior: (
-          ActorRef[Benchmark.Protocol[T]],
+          ActorRef[ClusterBenchmark.Protocol[T]],
           Map[String, ActorRef[T]],
           Boolean
       ) => Behavior[T],
       workerBehaviors: Map[String, Behavior[T]]
-  ): Benchmark[T] = {
+  ): ClusterBenchmark[T] = {
     val workerBehaviors2 =
       for ((name, behavior) <- workerBehaviors) yield name -> Map(name -> behavior)
     def orchestratorBehavior2(
-        parentRef: ActorRef[Benchmark.Protocol[T]],
-        workerNodes: Map[String, Map[String, ActorRef[T]]],
-        isWarmup: Boolean
+                               parentRef: ActorRef[ClusterBenchmark.Protocol[T]],
+                               workerNodes: Map[String, Map[String, ActorRef[T]]],
+                               isWarmup: Boolean
     ): Behavior[T] = {
       val workerRefs =
         for ((_, map) <- workerNodes; (name, ref) <- map) yield name -> ref
       orchestratorBehavior(parentRef, workerRefs, isWarmup)
     }
-    new Benchmark(
+    new ClusterBenchmark(
       orchestratorBehavior2,
       workerBehaviors2
     )
@@ -76,16 +77,16 @@ object Benchmark {
   case object OrchestratorDone extends Protocol[Nothing]
 }
 
-class Benchmark[T](
+class ClusterBenchmark[T](
     orchestratorBehavior: (
-        ActorRef[Benchmark.Protocol[T]],
+        ActorRef[ClusterBenchmark.Protocol[T]],
         Map[String, Map[String, ActorRef[T]]],
         Boolean
     ) => Behavior[T],
     workerBehaviors: Map[String, Map[String, Behavior[T]]]
 ) {
 
-  import Benchmark._
+  import ClusterBenchmark._
 
   private val numWorkers = workerBehaviors.size
   private val OrchestratorServiceKey = ServiceKey[Protocol[T]]("ClusterBench")

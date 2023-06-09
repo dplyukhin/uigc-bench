@@ -1,13 +1,13 @@
 package cluster.putDatum
 
-import akka.actor.typed.*
+import akka.actor.typed._
 import akka.actor.typed.scaladsl.Behaviors
-import cluster.SimpleBenchmark
+import common.ClusterBenchmark
 
 object ThroughputBenchmark {
 
   def main(args: Array[String]): Unit =
-    SimpleBenchmark(
+    ClusterBenchmark(
       Orchestrator.apply,
       Map(
         "worker1" -> Behaviors.empty,

@@ -1,7 +1,5 @@
 package common
 
-import java.util._
-
 trait Benchmark {
   val name: String
   def init(): Unit
