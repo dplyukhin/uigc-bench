@@ -30,21 +30,11 @@ import java.io.{BufferedWriter, FileWriter}
   */
 
 object Benchmark {
-  trait Protocol extends java.io.Serializable
-  case class WorkerJoinedMessage(role: String, ref: ActorRef[Protocol])
-      extends Protocol
-  case object SpawnWorker extends Protocol
-  case class SpawnWorkerAck(role: String, ref: Map[String, ActorRef[Nothing]])
-      extends Protocol
-  case object OrchestratorReady extends Protocol
-  case object OrchestratorDone extends Protocol
-
   def dumpMeasurements(iterationTimes: Iterable[Double], filename: String): Unit =
     if (filename == null) {
       println("ERROR: Missing filename. Dumping measurements to stdout.")
       for (time <- iterationTimes) println(time)
-    }
-    else {
+    } else {
       println(s"Writing measurements to $filename")
       val writer = new BufferedWriter(new FileWriter(filename, true))
       for (time <- iterationTimes) writer.write(time + "\n")
@@ -53,24 +43,24 @@ object Benchmark {
 
   /** A benchmark with only one actor per system */
   def SimpleBenchmark(
-                       orchestratorBehavior: (
-                         ActorRef[Benchmark.Protocol],
-                           Map[String, ActorRef[Nothing]],
-                           Boolean
-                         ) => Behavior[Nothing],
-                       workerBehaviors: Map[String, Behavior[Nothing]]
-                     ): Benchmark = {
+      orchestratorBehavior: (
+          ActorRef[Benchmark.Protocol],
+          Map[String, ActorRef[Nothing]],
+          Boolean
+      ) => Behavior[Nothing],
+      workerBehaviors: Map[String, Behavior[Nothing]]
+  ): Benchmark = {
     val workerBehaviors2 = (
       for ((name, behavior) <- workerBehaviors) yield name -> Map(name -> behavior)
-      ).toMap
+    ).toMap
     def orchestratorBehavior2(
-                               parentRef: ActorRef[Benchmark.Protocol],
-                               workerNodes: Map[String, Map[String, ActorRef[Nothing]]],
-                               isWarmup: Boolean
-                             ): Behavior[Nothing] = {
+        parentRef: ActorRef[Benchmark.Protocol],
+        workerNodes: Map[String, Map[String, ActorRef[Nothing]]],
+        isWarmup: Boolean
+    ): Behavior[Nothing] = {
       val workerRefs = (
         for ((_, map) <- workerNodes; (name, ref) <- map) yield name -> ref
-        ).toMap
+      ).toMap
       orchestratorBehavior(parentRef, workerRefs, isWarmup)
     }
     Benchmark(
@@ -78,6 +68,18 @@ object Benchmark {
       workerBehaviors2
     )
   }
+
+  trait Protocol
+
+  case class WorkerJoinedMessage(role: String, ref: ActorRef[Protocol]) extends Protocol
+
+  case class SpawnWorkerAck(role: String, ref: Map[String, ActorRef[Nothing]]) extends Protocol
+
+  case object SpawnWorker extends Protocol
+
+  case object OrchestratorReady extends Protocol
+
+  case object OrchestratorDone extends Protocol
 }
 
 class Benchmark(
@@ -94,6 +96,45 @@ class Benchmark(
   private val numWorkers = workerBehaviors.size
   private val OrchestratorServiceKey = ServiceKey[Protocol]("ClusterBench")
 
+  def runBenchmark(args: Array[String]): Unit =
+    // Run them all on the same node
+    if (args.isEmpty) {
+      startup("orchestrator", 25251)
+      for ((name, _) <- workerBehaviors) startup(name, 0)
+    } else if (args.length != 3) {
+      println(
+        s"Invalid arguments. Expected 3 args: {role} {hostname} {leader hostname}.\nGot $args."
+      )
+    } else {
+      val role = args(0)
+      val hostname = args(1)
+      val leaderhost = args(2)
+      if (role == "orchestrator") startup(role, 25251, hostname, leaderhost)
+      else startup(role, 0, hostname, leaderhost)
+    }
+
+  private def startup(
+      role: String,
+      port: Int,
+      hostname: String = "127.0.0.1",
+      leaderhost: String = "127.0.0.1"
+  ): Unit = {
+
+    // Override the configuration of the port when specified as program argument
+    val config = ConfigFactory
+      .parseString(s"""
+      akka.remote.artery.canonical.hostname=$hostname
+      akka.remote.artery.canonical.port=$port
+      akka.cluster.roles = [$role]
+      akka.cluster.seed-nodes = ["akka://ClusterSystem@$leaderhost:25251"]
+      """)
+      .withFallback(ConfigFactory.load("application"))
+
+    if (role == "orchestrator")
+      ActorSystem[Protocol](Orchestrator(), "ClusterSystem", config)
+    else ActorSystem[Protocol](Worker(role), "ClusterSystem", config)
+  }
+
   object Orchestrator {
 
     def apply(): Behavior[Protocol] = Behaviors.setup[Protocol] { ctx =>
@@ -102,8 +143,8 @@ class Benchmark(
     }
 
     private def waitForWorkerNodes(
-                                    workerNodes: Map[String, ActorRef[Protocol]]
-                                  ): Behavior[Protocol] =
+        workerNodes: Map[String, ActorRef[Protocol]]
+    ): Behavior[Protocol] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case WorkerJoinedMessage(role, workerNode) =>
@@ -119,18 +160,17 @@ class Benchmark(
       }
 
     private def waitForWorkers(
-                                iterationTimes: Seq[Double],
-                                workerNodes: Map[String, ActorRef[Protocol]],
-                                workers: Map[String, Map[String, ActorRef[Nothing]]]
-                              ): Behavior[Protocol] =
+        iterationTimes: Seq[Double],
+        workerNodes: Map[String, ActorRef[Protocol]],
+        workers: Map[String, Map[String, ActorRef[Nothing]]]
+    ): Behavior[Protocol] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
           case SpawnWorkerAck(role, subworkers) =>
             val newWorkers = workers + (role -> subworkers)
             if (newWorkers.size < numWorkers) {
               waitForWorkers(iterationTimes, workerNodes, newWorkers)
-            }
-            else {
+            } else {
               val config = ConfigFactory.load("benchmark")
               val warmupIterations = config.getInt("bench.warmup-iter")
               val isWarmup = iterationTimes.length < warmupIterations
@@ -141,9 +181,9 @@ class Benchmark(
       }
 
     private def waitForOrchestrator(
-                                     iterationTimes: Seq[Double],
-                                     workerNodes: Map[String, ActorRef[Protocol]]
-                                   ): Behavior[Protocol] =
+        iterationTimes: Seq[Double],
+        workerNodes: Map[String, ActorRef[Protocol]]
+    ): Behavior[Protocol] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case OrchestratorReady =>
@@ -153,10 +193,10 @@ class Benchmark(
       }
 
     private def waitForIterationCompletion(
-                                            startTime: Double,
-                                            iterationTimes: Seq[Double],
-                                            workerNodes: Map[String, ActorRef[Protocol]]
-                                          ): Behavior[Protocol] =
+        startTime: Double,
+        iterationTimes: Seq[Double],
+        workerNodes: Map[String, ActorRef[Protocol]]
+    ): Behavior[Protocol] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case OrchestratorDone =>
@@ -180,8 +220,7 @@ class Benchmark(
               for ((_, workerNode) <- workerNodes)
                 workerNode ! SpawnWorker
               waitForWorkers(newIterationTimes, workerNodes, Map())
-            }
-            else {
+            } else {
               val iterationTimes = newIterationTimes.drop(10)
               val avg = iterationTimes.sum / iterationTimes.length
               val min = iterationTimes.min
@@ -215,61 +254,19 @@ class Benchmark(
       }
 
     private def prepareForIteration(
-                                     role: String,
-                                     orchestratorNode: ActorRef[Protocol]
-                                   ): Behavior[Protocol] =
+        role: String,
+        orchestratorNode: ActorRef[Protocol]
+    ): Behavior[Protocol] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
           case SpawnWorker =>
             val workers =
               for ((name, worker) <- workerBehaviors(role)) yield name -> ctx.spawnAnonymous(worker)
-            orchestratorNode ! SpawnWorkerAck(role, workers.toMap)
+            orchestratorNode ! SpawnWorkerAck(role, workers)
             prepareForIteration(role, orchestratorNode)
           case _ =>
             Behaviors.stopped
         }
       }
-  }
-
-  private def startup(
-                       role: String,
-                       port: Int,
-                       hostname: String = "127.0.0.1",
-                       leaderhost: String = "127.0.0.1"
-                     ): Unit = {
-
-    // Override the configuration of the port when specified as program argument
-    val config = ConfigFactory
-      .parseString(
-        s"""
-      akka.remote.artery.canonical.hostname=$hostname
-      akka.remote.artery.canonical.port=$port
-      akka.cluster.roles = [$role]
-      akka.cluster.seed-nodes = ["akka://ClusterSystem@$leaderhost:25251"]
-      """)
-      .withFallback(ConfigFactory.load("application"))
-
-    if (role == "orchestrator")
-      ActorSystem[Protocol](Orchestrator(), "ClusterSystem", config)
-    else ActorSystem[Protocol](Worker(role), "ClusterSystem", config)
-  }
-
-  def runBenchmark(args: Array[String]): Unit = {
-    // Run them all on the same node
-    if (args.isEmpty) {
-      startup("orchestrator", 25251)
-      for ((name, _) <- workerBehaviors) startup(name, 0)
-    }
-    else if (args.length != 3) {
-      println(
-        s"Invalid arguments. Expected 3 args: {role} {hostname} {leader hostname}.\nGot $args."
-      )
-    } else {
-      val role = args(0)
-      val hostname = args(1)
-      val leaderhost = args(2)
-      if (role == "orchestrator") startup(role, 25251, hostname, leaderhost)
-      else startup(role, 0, hostname, leaderhost)
-    }
   }
 }
