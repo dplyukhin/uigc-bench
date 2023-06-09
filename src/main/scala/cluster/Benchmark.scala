@@ -50,35 +50,29 @@ object Benchmark {
       ) => Behavior[Nothing],
       workerBehaviors: Map[String, Behavior[Nothing]]
   ): Benchmark = {
-    val workerBehaviors2 = (
+    val workerBehaviors2 =
       for ((name, behavior) <- workerBehaviors) yield name -> Map(name -> behavior)
-    ).toMap
     def orchestratorBehavior2(
         parentRef: ActorRef[Benchmark.Protocol],
         workerNodes: Map[String, Map[String, ActorRef[Nothing]]],
         isWarmup: Boolean
     ): Behavior[Nothing] = {
-      val workerRefs = (
+      val workerRefs =
         for ((_, map) <- workerNodes; (name, ref) <- map) yield name -> ref
-      ).toMap
       orchestratorBehavior(parentRef, workerRefs, isWarmup)
     }
-    Benchmark(
+    new Benchmark(
       orchestratorBehavior2,
       workerBehaviors2
     )
   }
 
   trait Protocol
-
   case class WorkerJoinedMessage(role: String, ref: ActorRef[Protocol]) extends Protocol
-
   case class SpawnWorkerAck(role: String, ref: Map[String, ActorRef[Nothing]]) extends Protocol
-
+  case class ReceptionistListing(listing: Receptionist.Listing) extends Protocol
   case object SpawnWorker extends Protocol
-
   case object OrchestratorReady extends Protocol
-
   case object OrchestratorDone extends Protocol
 }
 
@@ -103,7 +97,7 @@ class Benchmark(
       for ((name, _) <- workerBehaviors) startup(name, 0)
     } else if (args.length != 3) {
       println(
-        s"Invalid arguments. Expected 3 args: {role} {hostname} {leader hostname}.\nGot $args."
+        s"Invalid arguments. Expected 3 args: {role} {hostname} {leader hostname}.\nGot ${args.mkString("Array(", ", ", ")")}."
       )
     } else {
       val role = args(0)
@@ -235,14 +229,15 @@ class Benchmark(
 
   private object Worker {
     def apply(role: String): Behavior[Protocol] = Behaviors.setup[Protocol] { ctx =>
-      ctx.system.receptionist ! Receptionist.Subscribe(OrchestratorServiceKey, ctx.self)
+      val adapter = ctx.messageAdapter[Receptionist.Listing](ReceptionistListing.apply)
+      ctx.system.receptionist ! Receptionist.Subscribe(OrchestratorServiceKey, adapter)
       waitForOrchestrator(role)
     }
 
     private def waitForOrchestrator(role: String): Behavior[Protocol] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
-          case OrchestratorServiceKey.Listing(listings) =>
+          case ReceptionistListing(OrchestratorServiceKey.Listing(listings)) =>
             listings.find(_ => true) match {
               case Some(orchestratorNode) =>
                 orchestratorNode ! WorkerJoinedMessage(role, ctx.self)
