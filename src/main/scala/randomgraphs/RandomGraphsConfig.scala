@@ -13,6 +13,10 @@ object RandomGraphsConfig {
   val ProbabilityToReleaseRef : Double = 0.1
   /** P4 is the probability for Action 4: Sending Application Messages to Actors */
   val ProbabilityToPing : Double = 0.4
+  /** P5 is the probability for Action 5: Sleep */
+  val ProbabilityToSleep: Double = 0.05
+  /** Time to sleep (in nanoseconds) */
+  val SleepDuration: Long = 50
   /** P is the amount of ping messages that will be sent  */
   val NumberOfPingsSent : Int = 1000
   /** The size of each actor in bytes */

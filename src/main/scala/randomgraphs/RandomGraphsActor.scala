@@ -33,13 +33,20 @@ trait RandomGraphsActor[T] {
         if (LogStats) statistics.pingCount.incrementAndGet()
     }
 
-    final def noop(): Unit = {
+    private final def sleep(): Unit = {
+        val sleepMillis: Long = SleepDuration / 1000
+        val sleepNanos: Int = (SleepDuration % 1000).toInt
+        Thread.sleep(sleepMillis, sleepNanos)
+        if (LogStats) statistics.sleepCount.incrementAndGet()
+    }
+
+    private final def noop(): Unit = {
         if (LogStats) statistics.noopCount.incrementAndGet()
     }
 
     final def doSomeActions(): Unit = {
-        if (statistics.latch.getCount() == 0) {
-            return ()
+        if (statistics.latch.getCount == 0) {
+            return
         }
 
         /** generates a list size of M of random doubles between 0.0 to 1.0 */
@@ -57,6 +64,9 @@ trait RandomGraphsActor[T] {
             }
             else if (r < ProbabilityToSpawn + ProbabilityToSendRef + ProbabilityToReleaseRef + ProbabilityToPing && acquaintances.nonEmpty) {
                 ping(randomItem(acquaintances))
+            }
+            else if (r < ProbabilityToSpawn + ProbabilityToSendRef + ProbabilityToReleaseRef + ProbabilityToPing + ProbabilityToSleep && acquaintances.nonEmpty) {
+                sleep()
             }
             else {
                 noop()

@@ -68,13 +68,13 @@ object ClusterBenchmark {
     )
   }
 
-  trait Protocol[+T]
+  trait Protocol[T]
   case class WorkerJoinedMessage[T](role: String, ref: ActorRef[Protocol[T]]) extends Protocol[T]
   case class SpawnWorkerAck[T](role: String, ref: Map[String, ActorRef[T]]) extends Protocol[T]
-  case class ReceptionistListing(listing: Receptionist.Listing) extends Protocol[Nothing]
-  case object SpawnWorker extends Protocol[Nothing]
-  case object OrchestratorReady extends Protocol[Nothing]
-  case object OrchestratorDone extends Protocol[Nothing]
+  case class ReceptionistListing[T](listing: Receptionist.Listing) extends Protocol[T]
+  case class SpawnWorker[T]() extends Protocol[T]
+  case class OrchestratorReady[T]() extends Protocol[T]
+  case class OrchestratorDone[T]() extends Protocol[T]
 }
 
 class ClusterBenchmark[T](
@@ -148,7 +148,7 @@ class ClusterBenchmark[T](
               waitForWorkerNodes(newWorkerNodes)
             else {
               for ((_, workerNode) <- newWorkerNodes)
-                workerNode ! SpawnWorker
+                workerNode ! SpawnWorker()
               waitForWorkers(Seq[Double](), newWorkerNodes, Map())
             }
         }
@@ -181,7 +181,7 @@ class ClusterBenchmark[T](
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
-          case OrchestratorReady =>
+          case OrchestratorReady() =>
             val startTime = System.nanoTime()
             waitForIterationCompletion(startTime, iterationTimes, workerNodes)
         }
@@ -194,7 +194,7 @@ class ClusterBenchmark[T](
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
-          case OrchestratorDone =>
+          case OrchestratorDone() =>
             val endTime = System.nanoTime()
             val iterationTime = (endTime - startTime) / 1e6
             val newIterationTimes = iterationTimes :+ iterationTime
@@ -213,7 +213,7 @@ class ClusterBenchmark[T](
             }
             if (newIterationTimes.length < totalIterations) {
               for ((_, workerNode) <- workerNodes)
-                workerNode ! SpawnWorker
+                workerNode ! SpawnWorker()
               waitForWorkers(newIterationTimes, workerNodes, Map())
             } else {
               val iterationTimes = newIterationTimes.drop(10)
@@ -255,7 +255,7 @@ class ClusterBenchmark[T](
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
-          case SpawnWorker =>
+          case SpawnWorker() =>
             val workers =
               for ((name, worker) <- workerBehaviors(role)) yield name -> ctx.spawnAnonymous(worker)
             orchestratorNode ! SpawnWorkerAck(role, workers)

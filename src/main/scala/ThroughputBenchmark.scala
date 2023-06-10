@@ -7,7 +7,7 @@ import scala.concurrent.duration.DurationInt
 
 object ThroughputBenchmark {
 
-  private trait Protocol
+  trait Protocol
   private case class SetOrchestrator(orchestrator: ActorRef[Protocol]) extends Protocol
   private case object NewRequest extends Protocol
 
@@ -24,7 +24,7 @@ object ThroughputBenchmark {
         val worker1 = workers("worker1")
         val self = ctx.self
 
-        parent ! ClusterBenchmark.OrchestratorReady
+        parent ! ClusterBenchmark.OrchestratorReady()
         worker1 ! SetOrchestrator(self)
 
         Behaviors
@@ -39,7 +39,7 @@ object ThroughputBenchmark {
     ClusterBenchmark(
       Orchestrator.apply,
       Map(
-        "worker1" -> Behaviors.empty,
+        "worker1" -> Behaviors.ignore[Protocol],
       )
     ).runBenchmark(args)
 }

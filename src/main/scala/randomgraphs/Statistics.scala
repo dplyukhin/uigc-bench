@@ -8,6 +8,7 @@ class Statistics {
     val linkCount    = new AtomicInteger()
     val releaseCount = new AtomicInteger()
     val pingCount    = new AtomicInteger()
+    val sleepCount   = new AtomicInteger()
     val noopCount    = new AtomicInteger()
     val terminatedCount = new AtomicInteger()
 
@@ -17,6 +18,7 @@ class Statistics {
            |Number of links created:     ${linkCount.get()}
            |Number of links released:    ${releaseCount.get()}
            |Number of pings sent:        ${pingCount.get()}
+           |Number of sleeps performed:  ${sleepCount.get()}
            |Number of noops performed:   ${noopCount.get()}
            |Number of terminated actors: ${terminatedCount.get()}
            |""".stripMargin
