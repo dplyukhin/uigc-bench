@@ -123,7 +123,7 @@ class ClusterBenchmark[T](
       akka.cluster.roles = [$role]
       akka.cluster.seed-nodes = ["akka://ClusterSystem@$leaderhost:25251"]
       """)
-      .withFallback(ConfigFactory.load("application"))
+      .withFallback(ConfigFactory.load("cluster"))
 
     if (role == "orchestrator")
       ActorSystem[Protocol[T]](Orchestrator(), "ClusterSystem", config)

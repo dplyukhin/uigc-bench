@@ -1,14 +1,15 @@
 package randomgraphs
 
-import akka.actor.typed.{Behavior => AkkaBehavior, ActorSystem}
+import akka.actor.typed.{ActorSystem, Behavior => AkkaBehavior}
 import edu.illinois.osl.akka.gc._
 import edu.illinois.osl.akka.gc.protocol._
 import edu.illinois.osl.akka.gc.interfaces.{Message, NoRefs}
 import common.Benchmark
+
 import scala.concurrent.Await
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, DurationInt}
 import com.typesafe.config.ConfigFactory
-import akka.actor.typed.{Signal, PostStop}
+import akka.actor.typed.{PostStop, Signal}
 
 object RandomGraphsAkkaGCActorBenchmark extends App with Benchmark {
 
@@ -38,9 +39,6 @@ object RandomGraphsAkkaGCActorBenchmark extends App with Benchmark {
   }
 
   def run(): Unit = {
-    for (_ <- 1 to RandomGraphsConfig.NumberOfPingsSent) {
-      system ! BenchmarkActor.Ping()
-    }
     try {
       stats.latch.await()
       println(stats)
@@ -51,6 +49,8 @@ object RandomGraphsAkkaGCActorBenchmark extends App with Benchmark {
   }
 
   object BenchmarkActor {
+    import RandomGraphsConfig._
+
     sealed trait Msg extends Message
     final case class Link(ref: Refob[Msg]) extends Msg {
       def refs = Seq(ref)
@@ -64,11 +64,14 @@ object RandomGraphsAkkaGCActorBenchmark extends App with Benchmark {
     }
 
     def createRoot(statistics: Statistics): AkkaBehavior[Msg] = {
-      Behaviors.setupRoot(context => {
-        if (RandomGraphsConfig.ShouldLog) 
-          println("\nSpawned root actor\n")
-        new BenchmarkActor(context, statistics)
-      })
+      Behaviors.withTimers[Msg] { timers =>
+        Behaviors.setupRoot(context => {
+          timers.startTimerAtFixedRate((), Ping(), (1000000000 / PingsPerSecond).nanos)
+          if (RandomGraphsConfig.ShouldLog)
+            println("\nSpawned root actor\n")
+          new BenchmarkActor(context, statistics)
+        })
+      }
     }
   }
 
@@ -128,8 +131,11 @@ object RandomGraphsAkkaGCActorBenchmark extends App with Benchmark {
 
     override def onSignal: PartialFunction[Signal,Behavior[Msg]] = {
       case PostStop =>
-        if (RandomGraphsConfig.LogStats) 
-          statistics.terminatedCount.incrementAndGet()
+        if (RandomGraphsConfig.LogStats) {
+          val n = statistics.terminatedCount.incrementAndGet()
+          if (n % 300 == 0)
+            println(s"Terminated $n actors")
+        }
         this
     }
   }

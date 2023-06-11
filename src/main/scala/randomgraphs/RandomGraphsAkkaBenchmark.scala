@@ -1,10 +1,11 @@
 package randomgraphs
 
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, Behavior, ActorSystem}
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import common.Benchmark
+
 import scala.concurrent.Await
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, DurationInt}
 
 object RandomGraphsAkkaBenchmark extends App with Benchmark {
 
@@ -25,9 +26,6 @@ object RandomGraphsAkkaBenchmark extends App with Benchmark {
   }
 
   def run(): Unit = {
-    for (_ <- 1 to RandomGraphsConfig.NumberOfPingsSent) {
-      system ! BenchmarkActor.Ping()
-    }
     try {
       stats.latch.await()
       println(stats)
@@ -38,12 +36,17 @@ object RandomGraphsAkkaBenchmark extends App with Benchmark {
   }
 
   object BenchmarkActor {
+    import RandomGraphsConfig._
+
     sealed trait Msg
     final case class Link(ref: ActorRef[Msg]) extends Msg
     final case class Ping() extends Msg
 
     def apply(statistics: Statistics): Behavior[Msg] = {
-      Behaviors.setup(context => new BenchmarkActor(context, statistics))
+      Behaviors.withTimers[Msg] { timers =>
+        timers.startTimerAtFixedRate((), Ping(), (1000000000 / PingsPerSecond).nanos)
+        Behaviors.setup(context => new BenchmarkActor(context, statistics))
+      }
     }
   }
 
