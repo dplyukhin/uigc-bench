@@ -17,7 +17,7 @@ object RandomGraphsAkkaBenchmark extends App with Benchmark {
 
   override def init(): Unit = {
     stats = new Statistics
-    system = ActorSystem(BenchmarkActor(stats), name)
+    system = ActorSystem(BenchmarkActor.createRoot(stats), name)
   }
 
   def cleanup(): Unit = {
@@ -43,6 +43,10 @@ object RandomGraphsAkkaBenchmark extends App with Benchmark {
     final case class Ping() extends Msg
 
     def apply(statistics: Statistics): Behavior[Msg] = {
+      Behaviors.setup(context => new BenchmarkActor(context, statistics))
+    }
+
+    def createRoot(statistics: Statistics): Behavior[Msg] = {
       Behaviors.withTimers[Msg] { timers =>
         timers.startTimerAtFixedRate((), Ping(), (1000000000 / PingsPerSecond).nanos)
         Behaviors.setup(context => new BenchmarkActor(context, statistics))
