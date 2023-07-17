@@ -16,6 +16,7 @@ lazy val bench = (project in file("."))
         "com.typesafe.akka" %% "akka-cluster-typed" % akkaVersion,
         "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion,
         "ch.qos.logback" % "logback-classic" % "1.2.3",
+        "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
     ),
 
     resolvers += "Artima Maven Repository" at "https://repo.artima.com/releases",

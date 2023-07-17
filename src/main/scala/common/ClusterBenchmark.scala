@@ -68,7 +68,7 @@ object ClusterBenchmark {
     )
   }
 
-  trait Protocol[T]
+  trait Protocol[T] extends CborSerializable
   case class WorkerJoinedMessage[T](role: String, ref: ActorRef[Protocol[T]]) extends Protocol[T]
   case class SpawnWorkerAck[T](role: String, ref: Map[String, ActorRef[T]]) extends Protocol[T]
   case class ReceptionistListing[T](listing: Receptionist.Listing) extends Protocol[T]

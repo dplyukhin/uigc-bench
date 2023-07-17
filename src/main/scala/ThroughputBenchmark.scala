@@ -2,12 +2,13 @@ import akka.actor.typed._
 import akka.actor.typed.scaladsl.Behaviors
 import com.typesafe.config.ConfigFactory
 import common.ClusterBenchmark
+import common.CborSerializable
 
 import scala.concurrent.duration.DurationInt
 
 object ThroughputBenchmark {
 
-  trait Protocol
+  trait Protocol extends CborSerializable
   private case class SetOrchestrator(orchestrator: ActorRef[Protocol]) extends Protocol
   private case object NewRequest extends Protocol
 
