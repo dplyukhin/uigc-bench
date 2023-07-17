@@ -1,5 +1,5 @@
 import akka.actor.typed._
-import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.scaladsl.{Behaviors, TimerScheduler}
 import com.typesafe.config.ConfigFactory
 import common.ClusterBenchmark
 import common.CborSerializable
@@ -11,6 +11,8 @@ object ThroughputBenchmark {
   trait Protocol extends CborSerializable
   private case class SetOrchestrator(orchestrator: ActorRef[Protocol]) extends Protocol
   private case object NewRequest extends Protocol
+  private case object Ping extends Protocol
+  private case object Ack extends Protocol
 
   object Orchestrator {
     def apply(
@@ -21,18 +23,46 @@ object ThroughputBenchmark {
       Behaviors.setup { ctx =>
         val config = ConfigFactory.load("throughput-bench")
         val REQS_PER_SECOND = config.getInt("throughput-bench.reqs-per-second")
+        val ITERATIONS = config.getInt("throughput-bench.iterations")
 
-        val worker1 = workers("worker1")
+        val worker = workers("worker")
         val self = ctx.self
 
         parent ! ClusterBenchmark.OrchestratorReady()
-        worker1 ! SetOrchestrator(self)
+        worker ! SetOrchestrator(self)
 
         Behaviors
           .withTimers[Protocol] { timers =>
             timers.startTimerAtFixedRate((), NewRequest, (1000000000 / REQS_PER_SECOND).nanos)
-            Behaviors.empty
+            loop(parent, worker, timers, ITERATIONS)
           }
+      }
+
+    private def loop(
+              parent: ActorRef[ClusterBenchmark.Protocol[Protocol]],
+              worker: ActorRef[Protocol],
+              timers: TimerScheduler[Protocol],
+              iterationsLeft: Int
+            ): Behavior[Protocol] =
+      Behaviors.receiveMessage {
+        case NewRequest =>
+          worker ! Ping
+          if (iterationsLeft <= 0) {
+            timers.cancelAll()
+            awaitResponse(parent)
+          }
+          else {
+            loop(parent, worker, timers, iterationsLeft - 1)
+          }
+      }
+
+    private def awaitResponse(
+                               parent: ActorRef[ClusterBenchmark.Protocol[Protocol]],
+                             ): Behavior[Protocol] =
+      Behaviors.receiveMessage {
+        case Ack =>
+          parent ! ClusterBenchmark.OrchestratorDone()
+          Behaviors.stopped
       }
   }
 
@@ -40,13 +70,24 @@ object ThroughputBenchmark {
     def apply(): Behavior[Protocol] =
       Behaviors.receiveMessage {
         case SetOrchestrator(orch) =>
-          loop(orch)
+          val config = ConfigFactory.load("throughput-bench")
+          val ITERATIONS = config.getInt("throughput-bench.iterations")
+          loop(orch, ITERATIONS)
       }
 
-    private def loop(orch: ActorRef[Protocol]): Behavior[Protocol] =
+    private def loop(
+                      orch: ActorRef[Protocol],
+                      iterationsLeft: Int
+                    ): Behavior[Protocol] =
       Behaviors.receiveMessage {
-        case NewRequest =>
-          loop(orch)
+        case Ping =>
+          if (iterationsLeft <= 0) {
+            orch ! Ack
+            Behaviors.stopped
+          }
+          else {
+            loop(orch, iterationsLeft - 1)
+          }
       }
   }
 
@@ -54,7 +95,7 @@ object ThroughputBenchmark {
     ClusterBenchmark(
       Orchestrator.apply,
       Map(
-        "worker1" -> Worker(),
+        "worker" -> Worker(),
       )
     ).runBenchmark(args)
 }
