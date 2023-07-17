@@ -35,11 +35,25 @@ object ThroughputBenchmark {
       }
   }
 
+  object Worker {
+    def apply(): Behavior[Protocol] =
+      Behaviors.receiveMessage {
+        case SetOrchestrator(orch) =>
+          loop(orch)
+      }
+
+    private def loop(orch: ActorRef[Protocol]): Behavior[Protocol] =
+      Behaviors.receiveMessage {
+        case NewRequest =>
+          loop(orch)
+      }
+  }
+
   def main(args: Array[String]): Unit =
     ClusterBenchmark(
       Orchestrator.apply,
       Map(
-        "worker1" -> Behaviors.ignore[Protocol],
+        "worker1" -> Worker(),
       )
     ).runBenchmark(args)
 }
