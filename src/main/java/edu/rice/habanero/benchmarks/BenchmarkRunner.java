@@ -1,7 +1,6 @@
 package edu.rice.habanero.benchmarks;
 
 import edu.rice.habanero.actors.AkkaActorState;
-import edu.rice.hj.runtime.config.HjSystemProperty;
 
 import java.util.*;
 
@@ -18,13 +17,6 @@ public class BenchmarkRunner {
     protected static int iterations = 12;
 
     private static void parseArgs(final String[] args) throws Exception {
-
-        final String numWorkers = HjSystemProperty.numWorkers.getPropertyValue();
-        if (numWorkers != null) {
-            System.setProperty("actors.corePoolSize", numWorkers);
-            System.setProperty("actors.maxPoolSize", numWorkers);
-        }
-
         final int argLimit = args.length - 1;
         for (int i = 0; i < argLimit; i++) {
             final String argName = args[i];

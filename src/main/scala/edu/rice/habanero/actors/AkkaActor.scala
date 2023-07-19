@@ -4,7 +4,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.{Actor, ActorRef, ActorSystem}
 import com.typesafe.config.{Config, ConfigFactory}
-import edu.rice.hj.runtime.util.ModCountDownLatch
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -76,7 +75,6 @@ abstract class AkkaActor[MsgType] extends Actor {
       onPreExit()
       context.stop(self)
       onPostExit()
-      AkkaActorState.actorLatch.countDown()
     }
   }
 
@@ -104,8 +102,6 @@ protected class StartAkkaActorMessage(promise: Promise[Boolean]) {
 }
 
 object AkkaActorState {
-
-  val actorLatch = new ModCountDownLatch(0)
 
   private val mailboxTypeKey = "actors.mailboxType"
   private var config: Config = null
@@ -184,28 +180,14 @@ object AkkaActorState {
   }
 
   def startActor(actorRef: ActorRef) {
-
-    AkkaActorState.actorLatch.updateCount()
-
     val promise = Promise[Boolean]()
     val message: StartAkkaActorMessage = new StartAkkaActorMessage(promise)
     actorRef ! message
-
-    val f = promise.future
-    f.onComplete {
-      case Success(value) =>
-        if (!value) {
-          AkkaActorState.actorLatch.countDown()
-        }
-      case Failure(e) => e.printStackTrace
-    }
-
   }
 
   def awaitTermination(system: ActorSystem) {
     try {
-      actorLatch.await()
-      system.shutdown()
+      system.terminate()
     } catch {
       case ex: InterruptedException => {
         ex.printStackTrace()
