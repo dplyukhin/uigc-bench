@@ -2,6 +2,8 @@ package edu.rice.habanero.benchmarks;
 
 import edu.rice.habanero.actors.AkkaActorState;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.util.*;
 
 /**
@@ -15,6 +17,7 @@ public class BenchmarkRunner {
     protected static final double tolerance = 0.20;
 
     protected static int iterations = 12;
+    static String filename = null;
 
     private static void parseArgs(final String[] args) throws Exception {
         final int argLimit = args.length - 1;
@@ -24,6 +27,9 @@ public class BenchmarkRunner {
 
             if (argName.equalsIgnoreCase("-iter")) {
                 iterations = Integer.parseInt(argValue);
+            }
+            if (argName.equalsIgnoreCase("-filename")) {
+                filename = argValue;
             }
         }
     }
@@ -107,6 +113,30 @@ public class BenchmarkRunner {
         System.out.printf(statDataOutputFormat, benchmark.name(), " Skewness", skewness(execTimes));
 
         System.out.println();
+
+
+        if (filename == null) {
+            System.out.println("Missing filename. Dumping measurements to stdout.");
+            for (Double time : execTimes) {
+                System.out.println(time);
+            }
+        } else {
+            System.out.println("Writing measurements to " + filename);
+            try {
+                BufferedWriter writer = new BufferedWriter(new FileWriter(filename, true));
+                for (Double time : execTimes) {
+                    writer.write(time + "\n");
+                }
+                writer.close();
+            }
+            catch (Exception e) {
+                System.out.println("Failed. Dumping to stdout.");
+                for (Double time : execTimes) {
+                    System.out.println(time);
+                }
+            }
+        }
+
     }
 
     public static List<Double> sanitize(final List<Double> rawList, final double tolerance) {
