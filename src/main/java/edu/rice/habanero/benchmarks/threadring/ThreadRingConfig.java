@@ -8,7 +8,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
 public final class ThreadRingConfig {
 
     protected static int N = 100; // num actors
-    protected static int R = 100_000; // num pings, does not need to be divisible by N
+    protected static int R = 500_000; // num pings, does not need to be divisible by N
     protected static boolean debug = false;
 
     protected static void parseArgs(final String[] args) {

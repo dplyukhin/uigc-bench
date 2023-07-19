@@ -5,6 +5,8 @@ import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.recmatmul.MatMulConfig.{DoneMessage, StopMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
  */
@@ -26,9 +28,11 @@ object MatMulAkkaActorBenchmark {
     def runIteration() {
 
       val system = AkkaActorState.newActorSystem("MatMul")
+      val latch = new CountDownLatch(1)
 
-      val master = system.actorOf(Props(new Master()))
+      val master = system.actorOf(Props(new Master(latch)))
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -39,7 +43,7 @@ object MatMulAkkaActorBenchmark {
     }
   }
 
-  private class Master extends AkkaActor[AnyRef] {
+  private class Master(latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private final val numWorkers: Int = MatMulConfig.NUM_WORKERS
     private final val workers = new Array[ActorRef](numWorkers)
@@ -76,6 +80,7 @@ object MatMulAkkaActorBenchmark {
           if (numWorkCompleted == numWorkSent) {
             var i: Int = 0
             while (i < numWorkers) {
+              latch.countDown()
               workers(i) ! StopMessage.ONLY
               i += 1
             }

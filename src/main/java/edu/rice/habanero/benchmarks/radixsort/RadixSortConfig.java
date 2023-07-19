@@ -7,7 +7,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
  */
 public final class RadixSortConfig {
 
-    protected static int N = 100_000; // data size
+    protected static int N = 200_000; // data size
     protected static long M = 1L << 60; // max value
     protected static long S = 2_048; // seed for random number generator
     protected static boolean debug = false;

@@ -12,7 +12,7 @@ public final class GuidedSearchConfig {
 
     protected static final int PRIORITY_GRANULARITY = 8;
     protected static int NUM_WORKERS = 20;
-    protected static int GRID_SIZE = 30;
+    protected static int GRID_SIZE = 50;
     protected static int PRIORITIES = 30;
     protected static int THRESHOLD = 1_024;
     protected static boolean debug = false;

@@ -4,6 +4,8 @@ import akka.actor.{ActorRef, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  *
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
@@ -26,9 +28,10 @@ object ThroughputAkkaActorBenchmark {
     def runIteration() {
 
       val system = AkkaActorState.newActorSystem("Throughput")
+      val latch = new CountDownLatch(ThroughputConfig.A)
 
       val actors = Array.tabulate[ActorRef](ThroughputConfig.A)(i => {
-        val loopActor = system.actorOf(Props(new ThroughputActor(ThroughputConfig.N)))
+        val loopActor = system.actorOf(Props(new ThroughputActor(ThroughputConfig.N, latch)))
         loopActor
       })
 
@@ -44,6 +47,7 @@ object ThroughputAkkaActorBenchmark {
         m += 1
       }
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -51,7 +55,7 @@ object ThroughputAkkaActorBenchmark {
     }
   }
 
-  private class ThroughputActor(totalMessages: Int) extends AkkaActor[AnyRef] {
+  private class ThroughputActor(totalMessages: Int, latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private var messagesProcessed = 0
 
@@ -61,6 +65,7 @@ object ThroughputAkkaActorBenchmark {
       ThroughputConfig.performComputation(37.2)
 
       if (messagesProcessed == totalMessages) {
+        latch.countDown()
         exit()
       }
     }

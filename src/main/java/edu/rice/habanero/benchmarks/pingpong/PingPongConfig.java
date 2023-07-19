@@ -7,7 +7,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
  */
 public final class PingPongConfig {
 
-    protected static int N = 40000;
+    protected static int N = 500000;
     protected static boolean debug = false;
 
     protected static void parseArgs(final String[] args) {

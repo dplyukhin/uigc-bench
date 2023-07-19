@@ -5,6 +5,8 @@ import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.threadring.ThreadRingConfig.{DataMessage, ExitMessage, PingMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  *
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
@@ -27,10 +29,11 @@ object ThreadRingAkkaActorBenchmark {
     def runIteration() {
 
       val system = AkkaActorState.newActorSystem("ThreadRing")
+      val latch = new CountDownLatch(1)
 
       val numActorsInRing = ThreadRingConfig.N
       val ringActors = Array.tabulate[ActorRef](numActorsInRing)(i => {
-        val loopActor = system.actorOf(Props(new ThreadRingActor(i, numActorsInRing)))
+        val loopActor = system.actorOf(Props(new ThreadRingActor(i, numActorsInRing, latch)))
         loopActor
       })
 
@@ -41,6 +44,7 @@ object ThreadRingAkkaActorBenchmark {
 
       ringActors(0) ! new PingMessage(ThreadRingConfig.R)
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -48,7 +52,7 @@ object ThreadRingAkkaActorBenchmark {
     }
   }
 
-  private class ThreadRingActor(id: Int, numActorsInRing: Int) extends AkkaActor[AnyRef] {
+  private class ThreadRingActor(id: Int, numActorsInRing: Int, latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private var nextActor: ActorRef = null
 
@@ -61,6 +65,7 @@ object ThreadRingAkkaActorBenchmark {
           if (pm.hasNext) {
             nextActor ! pm.next()
           } else {
+            latch.countDown()
             nextActor ! new ExitMessage(numActorsInRing)
           }
 

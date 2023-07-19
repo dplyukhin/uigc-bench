@@ -5,6 +5,8 @@ import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.pingpong.PingPongConfig.{Message, PingMessage, StartMessage, StopMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  *
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
@@ -27,12 +29,14 @@ object PingPongAkkaActorBenchmark {
     def runIteration() {
 
       val system = AkkaActorState.newActorSystem("PingPong")
+      val latch = new CountDownLatch(1)
 
       val pong = system.actorOf(Props(new PongActor()))
-      val ping = system.actorOf(Props(new PingActor(PingPongConfig.N, pong)))
+      val ping = system.actorOf(Props(new PingActor(PingPongConfig.N, pong, latch)))
 
       ping ! StartMessage.ONLY
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -40,7 +44,7 @@ object PingPongAkkaActorBenchmark {
     }
   }
 
-  private class PingActor(count: Int, pong: ActorRef) extends AkkaActor[Message] {
+  private class PingActor(count: Int, pong: ActorRef, latch: CountDownLatch) extends AkkaActor[Message] {
 
     private var pingsLeft: Int = count
 
@@ -56,6 +60,7 @@ object PingPongAkkaActorBenchmark {
           if (pingsLeft > 0) {
             self ! PingMessage.ONLY
           } else {
+            latch.countDown()
             pong ! StopMessage.ONLY
             exit()
           }

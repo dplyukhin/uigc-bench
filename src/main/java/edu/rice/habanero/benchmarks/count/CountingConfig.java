@@ -7,7 +7,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
  */
 public final class CountingConfig {
 
-    protected static int N = 1_000_000;
+    protected static int N = 3_000_000;
     protected static boolean debug = false;
 
     protected static void parseArgs(final String[] args) {

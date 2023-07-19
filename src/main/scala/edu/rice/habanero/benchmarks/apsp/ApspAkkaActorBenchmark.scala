@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
 import scala.collection.mutable.ListBuffer
 
 /**
@@ -35,12 +36,13 @@ object ApspAkkaActorBenchmark {
       val numBlocksInSingleDim: Int = numNodes / blockSize
 
       val system = AkkaActorState.newActorSystem("ForkJoin")
+      val latch = new CountDownLatch(numBlocksInSingleDim * numBlocksInSingleDim)
 
       // create and automatically the actors
       val blockActors = Array.tabulate[ActorRef](numBlocksInSingleDim, numBlocksInSingleDim) {
         (i, j) =>
           val myBlockId = (i * numBlocksInSingleDim) + j
-          val apspActor = system.actorOf(Props(new ApspFloydWarshallActor(myBlockId, blockSize, numNodes, graphData)))
+          val apspActor = system.actorOf(Props(new ApspFloydWarshallActor(myBlockId, blockSize, numNodes, graphData, latch)))
           apspActor
       }
       // create the links to the neighbors
@@ -73,6 +75,7 @@ object ApspAkkaActorBenchmark {
         }
       }
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -89,7 +92,7 @@ object ApspAkkaActorBenchmark {
 
   private case class ApspNeighborMessage(neighbors: ListBuffer[ActorRef]) extends ApspMessage
 
-  private class ApspFloydWarshallActor(myBlockId: Int, blockSize: Int, graphSize: Int, initGraphData: Array[Array[Long]]) extends AkkaActor[AnyRef] {
+  private class ApspFloydWarshallActor(myBlockId: Int, blockSize: Int, graphSize: Int, initGraphData: Array[Array[Long]], latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private val numBlocksInSingleDim: Int = graphSize / blockSize
     private val numNeighbors: Int = 2 * (numBlocksInSingleDim - 1)
@@ -126,6 +129,7 @@ object ApspAkkaActorBenchmark {
 
             if (k == graphSize - 1) {
               // we've completed the computation
+              latch.countDown()
               exit()
             }
           }

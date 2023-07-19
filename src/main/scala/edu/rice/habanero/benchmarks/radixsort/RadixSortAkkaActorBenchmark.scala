@@ -4,6 +4,8 @@ import akka.actor.{ActorRef, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
  */
@@ -25,8 +27,9 @@ object RadixSortAkkaActorBenchmark {
     def runIteration() {
 
       val system = AkkaActorState.newActorSystem("RadixSort")
+      val latch = new CountDownLatch(1)
 
-      val validationActor = system.actorOf(Props(new ValidationActor(RadixSortConfig.N)))
+      val validationActor = system.actorOf(Props(new ValidationActor(RadixSortConfig.N, latch)))
 
       val sourceActor = system.actorOf(Props(new IntSourceActor(RadixSortConfig.N, RadixSortConfig.M, RadixSortConfig.S)))
 
@@ -44,6 +47,7 @@ object RadixSortAkkaActorBenchmark {
 
       sourceActor ! NextActorMessage(nextActor)
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -113,7 +117,7 @@ object RadixSortAkkaActorBenchmark {
     }
   }
 
-  private class ValidationActor(numValues: Int) extends AkkaActor[AnyRef] {
+  private class ValidationActor(numValues: Int, latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private var sumSoFar = 0.0
     private var valuesSoFar = 0
@@ -139,6 +143,7 @@ object RadixSortAkkaActorBenchmark {
             } else {
               println("Elements sum: " + sumSoFar)
             }
+            latch.countDown()
             exit()
           }
       }

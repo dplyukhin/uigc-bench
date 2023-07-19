@@ -4,6 +4,8 @@ import akka.actor.{ActorRef, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  *
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
@@ -27,10 +29,12 @@ object ChameneosAkkaActorBenchmark {
 
       val system = AkkaActorState.newActorSystem("Chameneos")
 
+      val latch = new CountDownLatch(1)
       val mallActor = system.actorOf(Props(
         new ChameneosMallActor(
-          ChameneosConfig.numMeetings, ChameneosConfig.numChameneos)))
+          ChameneosConfig.numMeetings, ChameneosConfig.numChameneos, latch)))
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -38,7 +42,7 @@ object ChameneosAkkaActorBenchmark {
     }
   }
 
-  private class ChameneosMallActor(var n: Int, numChameneos: Int) extends AkkaActor[ChameneosHelper.Message] {
+  private class ChameneosMallActor(var n: Int, numChameneos: Int, latch: CountDownLatch) extends AkkaActor[ChameneosHelper.Message] {
 
     private var waitingChameneo: ActorRef = null
     private var sumMeetings: Int = 0
@@ -60,7 +64,7 @@ object ChameneosAkkaActorBenchmark {
           numFaded = numFaded + 1
           sumMeetings = sumMeetings + message.count
           if (numFaded == numChameneos) {
-            exit()
+            latch.countDown()
           }
         case message: ChameneosHelper.MeetMsg =>
           if (n > 0) {

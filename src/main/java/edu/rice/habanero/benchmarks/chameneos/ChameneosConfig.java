@@ -8,7 +8,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
 public final class ChameneosConfig {
 
     protected static int numChameneos = 100;
-    protected static int numMeetings = 200_000;
+    protected static int numMeetings = 400_000;
     protected static int numMailboxes = 1;
     protected static boolean usePriorities = true;
     protected static boolean debug = false;

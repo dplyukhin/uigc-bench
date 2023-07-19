@@ -11,7 +11,7 @@ import java.util.List;
  */
 public final class QuickSortConfig {
 
-    protected static int N = 1_000_000; // data size
+    protected static int N = 2_000_000; // data size
     protected static long M = 1L << 60; // max value
     protected static long T = 2_048; // threshold to perform sort sequentially
     protected static long S = 1_024; // seed for random number generator

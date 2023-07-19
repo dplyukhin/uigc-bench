@@ -4,6 +4,8 @@ import akka.actor.{ActorRef, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  *
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
@@ -26,13 +28,15 @@ object CountingAkkaActorBenchmark {
     def runIteration() {
 
       val system = AkkaActorState.newActorSystem("Counting")
+      val latch = new CountDownLatch(1)
 
       val counter = system.actorOf(Props(new CountingActor()))
 
-      val producer = system.actorOf(Props(new ProducerActor(counter)))
+      val producer = system.actorOf(Props(new ProducerActor(counter, latch)))
 
       producer ! IncrementMessage()
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -46,7 +50,7 @@ object CountingAkkaActorBenchmark {
 
   private case class ResultMessage(result: Int)
 
-  private class ProducerActor(counter: ActorRef) extends AkkaActor[AnyRef] {
+  private class ProducerActor(counter: ActorRef, latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     override def process(msg: AnyRef) {
       msg match {
@@ -67,6 +71,7 @@ object CountingAkkaActorBenchmark {
           } else {
             println("SUCCESS! received: " + result)
           }
+          latch.countDown()
           exit()
       }
     }

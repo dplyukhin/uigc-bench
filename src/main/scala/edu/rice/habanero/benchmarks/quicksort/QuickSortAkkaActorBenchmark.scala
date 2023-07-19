@@ -1,10 +1,11 @@
 package edu.rice.habanero.benchmarks.quicksort
 
 import java.util
-
 import akka.actor.{ActorRef, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
+
+import java.util.concurrent.CountDownLatch
 
 /**
  *
@@ -28,12 +29,14 @@ object QuickSortAkkaActorBenchmark {
     def runIteration() {
 
       val system = AkkaActorState.newActorSystem("QuickSort")
+      val latch = new CountDownLatch(1)
 
       val input = QuickSortConfig.randomlyInitArray()
 
-      val rootActor = system.actorOf(Props(new QuickSortActor(null, PositionInitial)))
+      val rootActor = system.actorOf(Props(new QuickSortActor(null, PositionInitial, latch)))
       rootActor ! SortMessage(input)
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -55,7 +58,7 @@ object QuickSortAkkaActorBenchmark {
 
   private case class ResultMessage(data: java.util.List[java.lang.Long], position: Position) extends Message
 
-  private class QuickSortActor(parent: ActorRef, positionRelativeToParent: Position) extends AkkaActor[AnyRef] {
+  private class QuickSortActor(parent: ActorRef, positionRelativeToParent: Position, latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private var result: java.util.List[java.lang.Long] = null
     private var numFragments = 0
@@ -67,6 +70,9 @@ object QuickSortAkkaActorBenchmark {
       }
       if (parent ne null) {
         parent ! ResultMessage(result, positionRelativeToParent)
+      }
+      else {
+        latch.countDown()
       }
       exit()
     }
@@ -87,11 +93,11 @@ object QuickSortAkkaActorBenchmark {
             val pivot = data.get(dataLengthHalf)
 
             val leftUnsorted = QuickSortConfig.filterLessThan(data, pivot)
-            val leftActor = context.system.actorOf(Props(new QuickSortActor(self, PositionLeft)))
+            val leftActor = context.system.actorOf(Props(new QuickSortActor(self, PositionLeft, null)))
             leftActor ! SortMessage(leftUnsorted)
 
             val rightUnsorted = QuickSortConfig.filterGreaterThan(data, pivot)
-            val rightActor = context.system.actorOf(Props(new QuickSortActor(self, PositionRight)))
+            val rightActor = context.system.actorOf(Props(new QuickSortActor(self, PositionRight, null)))
             rightActor ! SortMessage(rightUnsorted)
 
             result = QuickSortConfig.filterEqualsTo(data, pivot)

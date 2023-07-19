@@ -5,6 +5,8 @@ import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.nqueenk.NQueensConfig.{DoneMessage, ResultMessage, StopMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
  */
@@ -29,9 +31,10 @@ object NQueensAkkaActorBenchmark {
       val master: Array[ActorRef] = Array(null)
 
       val system = AkkaActorState.newActorSystem("NQueens")
+      val latch = new CountDownLatch(1)
+      master(0) = system.actorOf(Props(new Master(numWorkers, priorities, latch)))
 
-      master(0) = system.actorOf(Props(new Master(numWorkers, priorities)))
-
+      latch.await()
       AkkaActorState.awaitTermination(system)
 
       val expSolution = NQueensConfig.SOLUTIONS(NQueensConfig.SIZE - 1)
@@ -49,7 +52,7 @@ object NQueensAkkaActorBenchmark {
     var resultCounter: Long = 0
   }
 
-  private class Master(numWorkers: Int, priorities: Int) extends AkkaActor[AnyRef] {
+  private class Master(numWorkers: Int, priorities: Int, latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private val solutionsLimit = NQueensConfig.SOLUTIONS_LIMIT
     private final val workers = new Array[ActorRef](numWorkers)
@@ -80,12 +83,12 @@ object NQueensAkkaActorBenchmark {
         case _: NQueensConfig.ResultMessage =>
           Master.resultCounter += 1
           if (Master.resultCounter == solutionsLimit) {
-            requestWorkersToTerminate()
+            latch.countDown()
           }
         case _: NQueensConfig.DoneMessage =>
           numWorkCompleted += 1
           if (numWorkCompleted == numWorkSent) {
-            requestWorkersToTerminate()
+            latch.countDown()
           }
         case _: NQueensConfig.StopMessage =>
           numWorkersTerminated += 1

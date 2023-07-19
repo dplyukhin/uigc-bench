@@ -7,7 +7,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
  */
 public final class ForkJoinConfig {
 
-    protected static int N = 40000;
+    protected static int N = 200000;
     protected static int C = 1;
     protected static boolean debug = false;
 

@@ -8,7 +8,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
 public final class BigConfig {
 
     protected static int N = 20_000; // num pings
-    protected static int W = 120; // num actors
+    protected static int W = 400; // num actors
     protected static boolean debug = false;
 
     protected static void parseArgs(final String[] args) {

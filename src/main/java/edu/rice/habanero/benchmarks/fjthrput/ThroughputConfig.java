@@ -7,8 +7,8 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
  */
 public final class ThroughputConfig {
 
-    protected static int N = 10_000;
-    protected static int A = 60;
+    protected static int N = 50_000;
+    protected static int A = 100;
     protected static int C = 1;
     protected static boolean usePriorities = true;
     protected static boolean debug = false;

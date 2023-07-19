@@ -5,6 +5,8 @@ import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.big.BigConfig.{ExitMessage, Message, PingMessage, PongMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
  */
@@ -29,8 +31,9 @@ object BigAkkaActorBenchmark {
 
       val sinkActor = system.actorOf(Props(new SinkActor(BigConfig.W)))
 
+      val latch = new CountDownLatch(BigConfig.W)
       val bigActors = Array.tabulate[ActorRef](BigConfig.W)(i => {
-        val loopActor = system.actorOf(Props(new BigActor(i, BigConfig.N, sinkActor)))
+        val loopActor = system.actorOf(Props(new BigActor(i, BigConfig.N, sinkActor, latch)))
         loopActor
       })
 
@@ -44,6 +47,7 @@ object BigAkkaActorBenchmark {
         loopActor ! new PongMessage(-1)
       })
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -53,7 +57,7 @@ object BigAkkaActorBenchmark {
 
   private case class NeighborMessage(neighbors: Array[ActorRef]) extends Message
 
-  private class BigActor(id: Int, numMessages: Int, sinkActor: ActorRef) extends AkkaActor[AnyRef] {
+  private class BigActor(id: Int, numMessages: Int, sinkActor: ActorRef, latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private var numPings = 0
     private var expPinger = -1
@@ -76,15 +80,11 @@ object BigAkkaActorBenchmark {
             println("ERROR: Expected: " + expPinger + ", but received ping from " + pm.sender)
           }
           if (numPings == numMessages) {
-            sinkActor ! ExitMessage.ONLY
+            latch.countDown()
           } else {
             sendPing()
             numPings += 1
           }
-
-        case em: ExitMessage =>
-
-          exit()
 
         case nm: NeighborMessage =>
 
@@ -108,14 +108,6 @@ object BigAkkaActorBenchmark {
 
     override def process(msg: AnyRef) {
       msg match {
-        case em: ExitMessage =>
-
-          numMessages += 1
-          if (numMessages == numWorkers) {
-            neighbors.foreach(loopWorker => loopWorker ! ExitMessage.ONLY)
-            exit()
-          }
-
         case nm: NeighborMessage =>
 
           neighbors = nm.neighbors

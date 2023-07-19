@@ -7,7 +7,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
  */
 public final class ApspConfig {
 
-    protected static int N = 300;
+    protected static int N = 500;
     protected static int B = 50;
     protected static int W = 100;
     protected static boolean debug = false;

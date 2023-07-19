@@ -32,7 +32,7 @@ public final class NQueensConfig {
     private static final int MAX_SOLUTIONS = SOLUTIONS.length;
 
     protected static int NUM_WORKERS = 20;
-    protected static int SIZE = 12;
+    protected static int SIZE = 13;
     protected static int THRESHOLD = 4;
     protected static int PRIORITIES = 10;
     protected static int SOLUTIONS_LIMIT = 1_500_000;

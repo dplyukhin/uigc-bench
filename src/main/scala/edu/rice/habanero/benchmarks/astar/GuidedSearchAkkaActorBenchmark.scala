@@ -1,11 +1,12 @@
 package edu.rice.habanero.benchmarks.astar
 
 import java.util
-
 import akka.actor.{ActorRef, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.astar.GuidedSearchConfig._
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
+
+import java.util.concurrent.CountDownLatch
 
 /**
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
@@ -29,8 +30,10 @@ object GuidedSearchAkkaActorBenchmark {
 
       val system = AkkaActorState.newActorSystem("GuidedSearch")
 
-      val master = system.actorOf(Props(new Master()))
+      val latch = new CountDownLatch(1)
+      val master = system.actorOf(Props(new Master(latch)))
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
 
       val nodesProcessed = GuidedSearchConfig.nodesProcessed()
@@ -44,7 +47,7 @@ object GuidedSearchAkkaActorBenchmark {
     }
   }
 
-  private class Master extends AkkaActor[AnyRef] {
+  private class Master(latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private final val numWorkers = GuidedSearchConfig.NUM_WORKERS
     private final val workers = new Array[ActorRef](numWorkers)
@@ -72,24 +75,11 @@ object GuidedSearchAkkaActorBenchmark {
         case _: ReceivedMessage =>
           numWorkCompleted += 1
           if (numWorkCompleted == numWorkSent) {
-            requestWorkersToStop()
+            latch.countDown()
           }
         case _: DoneMessage =>
-          requestWorkersToStop()
-        case _: StopMessage =>
-          numWorkersTerminated += 1
-          if (numWorkersTerminated == numWorkers) {
-            exit()
-          }
+          latch.countDown()
         case _ =>
-      }
-    }
-
-    private def requestWorkersToStop() {
-      var i: Int = 0
-      while (i < numWorkers) {
-        workers(i) ! StopMessage.ONLY
-        i += 1
       }
     }
   }
@@ -103,9 +93,6 @@ object GuidedSearchAkkaActorBenchmark {
         case workMessage: WorkMessage =>
           search(workMessage)
           master ! ReceivedMessage.ONLY
-        case _: StopMessage =>
-          master ! theMsg
-          exit()
         case _ =>
       }
     }
