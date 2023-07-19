@@ -6,6 +6,9 @@ import akka.actor.typed.scaladsl.Behaviors
 import com.typesafe.config.ConfigFactory
 
 import java.io.{BufferedWriter, FileWriter}
+import java.util.concurrent.CountDownLatch
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 /** Cluster benchmarks follow this protocol.
   *
@@ -31,17 +34,6 @@ import java.io.{BufferedWriter, FileWriter}
   */
 
 object ClusterBenchmark {
-  private def dumpMeasurements(iterationTimes: Iterable[Double], filename: String): Unit =
-    if (filename == null) {
-      println("ERROR: Missing filename. Dumping measurements to stdout.")
-      for (time <- iterationTimes) println(time)
-    } else {
-      println(s"Writing measurements to $filename")
-      val writer = new BufferedWriter(new FileWriter(filename, true))
-      for (time <- iterationTimes) writer.write(time + "\n")
-      writer.close()
-    }
-
   /** A benchmark with only one actor per system */
   def apply[T](
       orchestratorBehavior: (
@@ -54,9 +46,9 @@ object ClusterBenchmark {
     val workerBehaviors2 =
       for ((name, behavior) <- workerBehaviors) yield name -> Map(name -> behavior)
     def orchestratorBehavior2(
-                               parentRef: ActorRef[ClusterBenchmark.Protocol[T]],
-                               workerNodes: Map[String, Map[String, ActorRef[T]]],
-                               isWarmup: Boolean
+        parentRef: ActorRef[ClusterBenchmark.Protocol[T]],
+        workerNodes: Map[String, Map[String, ActorRef[T]]],
+        isWarmup: Boolean
     ): Behavior[T] = {
       val workerRefs =
         for ((_, map) <- workerNodes; (name, ref) <- map) yield name -> ref
@@ -68,13 +60,29 @@ object ClusterBenchmark {
     )
   }
 
+  private def dumpMeasurements(iterationTimes: Iterable[Double]): Unit = {
+    val filename = System.getProperty("bench.filename")
+    if (filename == null) {
+      println("ERROR: Missing filename. Dumping measurements to stdout.")
+      for (time <- iterationTimes) println(time)
+    } else {
+      println(s"Writing measurements to $filename")
+      val writer = new BufferedWriter(new FileWriter(filename, true))
+      for (time <- iterationTimes) writer.write(time + "\n")
+      writer.close()
+    }
+  }
+
   trait Protocol[T] extends CborSerializable
-  case class WorkerJoinedMessage[T](role: String, ref: ActorRef[Protocol[T]]) extends Protocol[T]
-  case class SpawnWorkerAck[T](role: String, ref: Map[String, ActorRef[T]]) extends Protocol[T]
+  case class WorkerJoinedMessage[T](
+      role: String,
+      ref: ActorRef[Protocol[T]],
+      actors: Map[String, ActorRef[T]]
+  ) extends Protocol[T]
   case class ReceptionistListing[T](listing: Receptionist.Listing) extends Protocol[T]
-  case class SpawnWorker[T]() extends Protocol[T]
   case class OrchestratorReady[T]() extends Protocol[T]
   case class OrchestratorDone[T]() extends Protocol[T]
+  case class IterationDone[T]() extends Protocol[T]
 }
 
 class ClusterBenchmark[T](
@@ -93,13 +101,12 @@ class ClusterBenchmark[T](
 
   def runBenchmark(args: Array[String]): Unit =
     // Run them all on the same node
-    if (args.isEmpty) {
-      startup("orchestrator", 25251)
-      for ((name, _) <- workerBehaviors) startup(name, 0)
-    } else if (args.length != 3) {
+    if (args.length != 3) {
       println(
-        s"Invalid arguments. Expected 3 args: {role} {hostname} {leader hostname}.\nGot ${args.mkString("Array(", ", ", ")")}."
+        s"Invalid arguments. Expected 3 args: {role} {hostname} {leader hostname}.\nGot ${args
+            .mkString("Array(", ", ", ")")}."
       )
+      System.exit(1)
     } else {
       val role = args(0)
       val hostname = args(1)
@@ -114,7 +121,6 @@ class ClusterBenchmark[T](
       hostname: String = "127.0.0.1",
       leaderhost: String = "127.0.0.1"
   ): Unit = {
-
     // Override the configuration of the port when specified as program argument
     val config = ConfigFactory
       .parseString(s"""
@@ -125,142 +131,173 @@ class ClusterBenchmark[T](
       """)
       .withFallback(ConfigFactory.load("cluster"))
 
-    if (role == "orchestrator")
-      ActorSystem[Protocol[T]](Orchestrator(), "ClusterSystem", config)
-    else ActorSystem[Protocol[T]](Worker(role), "ClusterSystem", config)
+    // Load parameters
+    val benchConfig = ConfigFactory.load("benchmark")
+    val warmupIterations = benchConfig.getInt("bench.warmup-iter")
+    val normalIterations = benchConfig.getInt("bench.iterations")
+    var iterationTimes = Seq[Double]()
+
+    for (i <- 1 to (warmupIterations + normalIterations)) {
+
+      // Start the system and wait for it to be ready
+      val readyLatch = new CountDownLatch(1)
+      val doneLatch = new CountDownLatch(1)
+      val isWarmup = i <= warmupIterations
+      val system =
+        if (role == "orchestrator")
+          ActorSystem[Protocol[T]](
+            Orchestrator(readyLatch, doneLatch, isWarmup),
+            "ClusterSystem",
+            config
+          )
+        else
+          ActorSystem[Protocol[T]](Worker(role, readyLatch, doneLatch), "ClusterSystem", config)
+      readyLatch.await()
+      println("Ready!")
+
+      // Iteration is now running
+      val startTime = System.nanoTime()
+      doneLatch.await()
+      val endTime = System.nanoTime()
+
+      // Orchestrator logs iteration times
+      if (role == "orchestrator") {
+        val execTimeMillis = (endTime - startTime) / 1e6
+        if (i <= warmupIterations) {
+          println(s"Warmup iteration $i: $execTimeMillis ms")
+        } else {
+          val j = i - warmupIterations
+          iterationTimes = iterationTimes :+ execTimeMillis
+          println(s"Iteration ${j}: $execTimeMillis ms")
+        }
+      }
+
+      // Clean up the system for another iteration
+      system.terminate()
+      Await.ready(system.whenTerminated, Duration.Inf)
+      Thread.sleep(10000) // Wait for the partner to shutdown too
+    }
+
+    // All iterations are done
+    if (role == "orchestrator") {
+      val avg = iterationTimes.sum / iterationTimes.length
+      val min = iterationTimes.min
+      val max = iterationTimes.max
+      println(s"\nAverage: ${avg}\nMinimum: ${min}\nMaximum: ${max}")
+      dumpMeasurements(iterationTimes)
+    }
   }
 
   object Orchestrator {
 
-    def apply(): Behavior[Protocol[T]] = Behaviors.setup[Protocol[T]] { ctx =>
+    def apply(
+        readyLatch: CountDownLatch,
+        doneLatch: CountDownLatch,
+        isWarmup: Boolean
+    ): Behavior[Protocol[T]] = Behaviors.setup[Protocol[T]] { ctx =>
       ctx.system.receptionist ! Receptionist.Register(OrchestratorServiceKey, ctx.self)
-      waitForWorkerNodes(workerNodes = Map())
+      waitForWorkerNodes(workerNodes = Map(), workerActors = Map(), readyLatch, doneLatch, isWarmup)
     }
 
+    /** When the benchmark is first started, the orchestrator node waits for all the worker nodes to
+      * join the cluster.
+      */
     private def waitForWorkerNodes(
-        workerNodes: Map[String, ActorRef[Protocol[T]]]
-    ): Behavior[Protocol[T]] =
-      Behaviors.receive { (_, msg) =>
-        msg match {
-          case WorkerJoinedMessage(role, workerNode) =>
-            val newWorkerNodes = workerNodes + (role -> workerNode)
-            if (newWorkerNodes.size < numWorkers)
-              waitForWorkerNodes(newWorkerNodes)
-            else {
-              for ((_, workerNode) <- newWorkerNodes)
-                workerNode ! SpawnWorker()
-              waitForWorkers(Seq[Double](), newWorkerNodes, Map())
-            }
-        }
-      }
-
-    private def waitForWorkers(
-        iterationTimes: Seq[Double],
         workerNodes: Map[String, ActorRef[Protocol[T]]],
-        workers: Map[String, Map[String, ActorRef[T]]]
+        workerActors: Map[String, Map[String, ActorRef[T]]],
+        readyLatch: CountDownLatch,
+        doneLatch: CountDownLatch,
+        isWarmup: Boolean
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
-          case SpawnWorkerAck(role, subworkers) =>
-            val newWorkers = workers + (role -> subworkers)
-            if (newWorkers.size < numWorkers) {
-              waitForWorkers(iterationTimes, workerNodes, newWorkers)
-            } else {
-              val config = ConfigFactory.load("benchmark")
-              val warmupIterations = config.getInt("bench.warmup-iter")
-              val isWarmup = iterationTimes.length < warmupIterations
-              ctx.spawnAnonymous(orchestratorBehavior(ctx.self, newWorkers, isWarmup))
-              waitForOrchestrator(iterationTimes, workerNodes)
+          case WorkerJoinedMessage(role, node, actors) =>
+            val newWorkerNodes = workerNodes + (role -> node)
+            val newWorkerActors = workerActors + (role -> actors)
+            if (newWorkerNodes.size < numWorkers)
+              waitForWorkerNodes(newWorkerNodes, newWorkerActors, readyLatch, doneLatch, isWarmup)
+            else {
+              ctx.spawnAnonymous(orchestratorBehavior(ctx.self, newWorkerActors, isWarmup))
+              waitForOrchestrator(newWorkerNodes, readyLatch, doneLatch)
             }
         }
       }
 
+    /** After the orchestrator node learned the names of the worker actors, it spawned an
+      * orchestrator actor. Here the orch node waits for the orch actor to prepare for a new
+      * iteration of the benchmark. Once [[OrchestratorReady]] is received, the node starts a timer.
+      */
     private def waitForOrchestrator(
-        iterationTimes: Seq[Double],
-        workerNodes: Map[String, ActorRef[Protocol[T]]]
+        workerNodes: Map[String, ActorRef[Protocol[T]]],
+        readyLatch: CountDownLatch,
+        doneLatch: CountDownLatch
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case OrchestratorReady() =>
-            val startTime = System.nanoTime()
-            waitForIterationCompletion(startTime, iterationTimes, workerNodes)
+            readyLatch.countDown()
+            waitForIterationCompletion(workerNodes, doneLatch)
         }
       }
 
+    /** The orchestrator waits to receive [[OrchestratorDone]] and decides whether to do another
+      * iteration.
+      */
     private def waitForIterationCompletion(
-        startTime: Double,
-        iterationTimes: Seq[Double],
-        workerNodes: Map[String, ActorRef[Protocol[T]]]
+        workerNodes: Map[String, ActorRef[Protocol[T]]],
+        doneLatch: CountDownLatch
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case OrchestratorDone() =>
-            val endTime = System.nanoTime()
-            val iterationTime = (endTime - startTime) / 1e6
-            val newIterationTimes = iterationTimes :+ iterationTime
-
-            val config = ConfigFactory.load("benchmark")
-            val warmupIterations = config.getInt("bench.warmup-iter")
-            val normalIterations = config.getInt("bench.iterations")
-            val totalIterations = warmupIterations + normalIterations
-
-            if (newIterationTimes.length <= warmupIterations) {
-              println(s"Warmup iteration ${newIterationTimes.length}: $iterationTime ms")
-            } else {
-              println(
-                s"Iteration ${newIterationTimes.length - warmupIterations}: $iterationTime ms"
-              )
-            }
-            if (newIterationTimes.length < totalIterations) {
-              for ((_, workerNode) <- workerNodes)
-                workerNode ! SpawnWorker()
-              waitForWorkers(newIterationTimes, workerNodes, Map())
-            } else {
-              val iterationTimes = newIterationTimes.drop(10)
-              val avg = iterationTimes.sum / iterationTimes.length
-              val min = iterationTimes.min
-              val max = iterationTimes.max
-              println(s"\nAverage: $avg\nMinimum: $min\nMaximum: $max")
-              dumpMeasurements(iterationTimes, System.getProperty("bench.filename"))
-              Behaviors.stopped
-            }
+            doneLatch.countDown()
+            for ((_, worker) <- workerNodes)
+              worker ! IterationDone()
+            Behaviors.stopped
         }
       }
   }
 
   private object Worker {
-    def apply(role: String): Behavior[Protocol[T]] = Behaviors.setup[Protocol[T]] { ctx =>
+    def apply(
+        role: String,
+        readyLatch: CountDownLatch,
+        doneLatch: CountDownLatch
+    ): Behavior[Protocol[T]] = Behaviors.setup[Protocol[T]] { ctx =>
       val adapter = ctx.messageAdapter[Receptionist.Listing](ReceptionistListing.apply)
       ctx.system.receptionist ! Receptionist.Subscribe(OrchestratorServiceKey, adapter)
-      waitForOrchestrator(role)
+      val workers =
+        for ((name, worker) <- workerBehaviors(role)) yield name -> ctx.spawnAnonymous(worker)
+      readyLatch.countDown()
+      waitForOrchestrator(role, workers, doneLatch)
     }
 
-    private def waitForOrchestrator(role: String): Behavior[Protocol[T]] =
+    /** Worker node waits to receive a reference to the orchestrator node. */
+    private def waitForOrchestrator(
+        role: String,
+        workers: Map[String, ActorRef[T]],
+        doneLatch: CountDownLatch
+    ): Behavior[Protocol[T]] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
           case ReceptionistListing(OrchestratorServiceKey.Listing(listings)) =>
             listings.find(_ => true) match {
               case Some(orchestratorNode) =>
-                orchestratorNode ! WorkerJoinedMessage(role, ctx.self)
-                prepareForIteration(role, orchestratorNode)
+                orchestratorNode ! WorkerJoinedMessage(role, ctx.self, workers)
+                prepareForTermination(doneLatch)
               case None =>
-                waitForOrchestrator(role)
+                waitForOrchestrator(role, workers, doneLatch)
             }
         }
       }
 
-    private def prepareForIteration(
-        role: String,
-        orchestratorNode: ActorRef[Protocol[T]]
+    private def prepareForTermination(
+        doneLatch: CountDownLatch
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
-          case SpawnWorker() =>
-            val workers =
-              for ((name, worker) <- workerBehaviors(role)) yield name -> ctx.spawnAnonymous(worker)
-            orchestratorNode ! SpawnWorkerAck(role, workers)
-            prepareForIteration(role, orchestratorNode)
-          case _ =>
+          case IterationDone() =>
+            doneLatch.countDown()
             Behaviors.stopped
         }
       }
