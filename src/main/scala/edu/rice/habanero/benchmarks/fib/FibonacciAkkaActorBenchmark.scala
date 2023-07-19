@@ -4,6 +4,8 @@ import akka.actor.{ActorRef, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
+import java.util.concurrent.CountDownLatch
+
 /**
  *
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
@@ -27,10 +29,11 @@ object FibonacciAkkaActorBenchmark {
 
       val system = AkkaActorState.newActorSystem("Fibonacci")
 
-      val fjRunner = system.actorOf(Props(new FibonacciActor(null)))
-      AkkaActorState.startActor(fjRunner)
+      val latch = new CountDownLatch(1)
+      val fjRunner = system.actorOf(Props(new FibonacciActor(null, latch)))
       fjRunner ! Request(FibonacciConfig.N)
 
+      latch.await()
       AkkaActorState.awaitTermination(system)
     }
 
@@ -45,7 +48,7 @@ object FibonacciAkkaActorBenchmark {
   private val RESPONSE_ONE = Response(1)
 
 
-  private class FibonacciActor(parent: ActorRef) extends AkkaActor[AnyRef] {
+  private class FibonacciActor(parent: ActorRef, latch: CountDownLatch) extends AkkaActor[AnyRef] {
 
     private var result = 0
     private var respReceived = 0
@@ -62,12 +65,10 @@ object FibonacciAkkaActorBenchmark {
 
           } else {
 
-            val f1 = context.system.actorOf(Props(new FibonacciActor(self)))
-            AkkaActorState.startActor(f1)
+            val f1 = context.system.actorOf(Props(new FibonacciActor(self, null)))
             f1 ! Request(req.n - 1)
 
-            val f2 = context.system.actorOf(Props(new FibonacciActor(self)))
-            AkkaActorState.startActor(f2)
+            val f2 = context.system.actorOf(Props(new FibonacciActor(self, null)))
             f2 ! Request(req.n - 2)
 
           }
@@ -87,6 +88,7 @@ object FibonacciAkkaActorBenchmark {
       if (parent != null) {
         parent ! response
       } else {
+        latch.countDown()
         println(" Result = " + result)
       }
 

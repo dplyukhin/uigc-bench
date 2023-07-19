@@ -12,6 +12,7 @@ lazy val lib = (project in file("."))
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
       "ch.qos.logback" % "logback-classic" % "1.2.3",
+      "edu.illinois.osl" %% "akka-gc" % "0.1.0-SNAPSHOT",
     ),
     scalacOptions in Compile ++= Seq(
       "-optimise", 

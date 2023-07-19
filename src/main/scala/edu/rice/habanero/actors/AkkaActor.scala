@@ -17,22 +17,9 @@ import scala.util.{Failure, Success}
  */
 abstract class AkkaActor[MsgType] extends Actor {
 
-  private val startTracker = new AtomicBoolean(false)
-  private val exitTracker = new AtomicBoolean(false)
-
   final def receive = {
-    case msg: StartAkkaActorMessage =>
-      if (hasStarted()) {
-        msg.resolve(value = false)
-      } else {
-        start()
-        msg.resolve(value = true)
-      }
-
     case msg: Any =>
-      if (!exitTracker.get()) {
-        process(msg.asInstanceOf[MsgType])
-      }
+      process(msg.asInstanceOf[MsgType])
   }
 
   def process(msg: MsgType): Unit
@@ -41,41 +28,10 @@ abstract class AkkaActor[MsgType] extends Actor {
     self ! msg
   }
 
-  final def hasStarted() = {
-    startTracker.get()
-  }
-
-  final def start() = {
-    if (!hasStarted()) {
-      onPreStart()
-      onPostStart()
-      startTracker.set(true)
-    }
-  }
-
-  /**
-   * Convenience: specify code to be executed before actor is started
-   */
-  protected def onPreStart() = {
-  }
-
-  /**
-   * Convenience: specify code to be executed after actor is started
-   */
-  protected def onPostStart() = {
-  }
-
-  final def hasExited() = {
-    exitTracker.get()
-  }
-
   final def exit() = {
-    val success = exitTracker.compareAndSet(false, true)
-    if (success) {
-      onPreExit()
-      context.stop(self)
-      onPostExit()
-    }
+    onPreExit()
+    context.stop(self)
+    onPostExit()
   }
 
   /**
@@ -88,16 +44,6 @@ abstract class AkkaActor[MsgType] extends Actor {
    * Convenience: specify code to be executed after actor is terminated
    */
   protected def onPostExit() = {
-  }
-}
-
-protected class StartAkkaActorMessage(promise: Promise[Boolean]) {
-  def await() {
-    Await.result(promise.future, Duration.Inf)
-  }
-
-  def resolve(value: Boolean) {
-    promise.success(value)
   }
 }
 
@@ -177,12 +123,6 @@ object AkkaActorState {
 
   def newActorSystem(name: String): ActorSystem = {
     ActorSystem(name, config)
-  }
-
-  def startActor(actorRef: ActorRef) {
-    val promise = Promise[Boolean]()
-    val message: StartAkkaActorMessage = new StartAkkaActorMessage(promise)
-    actorRef ! message
   }
 
   def awaitTermination(system: ActorSystem) {
