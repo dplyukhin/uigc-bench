@@ -88,10 +88,6 @@ object AkkaActorState {
 
   def initialize(): Unit = {
 
-    val corePoolSize = getNumWorkers("actors.corePoolSize", 4)
-    val maxPoolSize = getNumWorkers("actors.maxPoolSize", corePoolSize)
-    val priorityMailboxType = getStringProp(mailboxTypeKey, "akka.dispatch.SingleConsumerOnlyUnboundedMailbox")
-
     val customConfigStr = """
     my-pinned-dispatcher {
       executor = "thread-pool-executor"
@@ -103,25 +99,18 @@ object AkkaActorState {
 
       actor {
         creation-timeout = 6000s
-        default-dispatcher {
-          fork-join-executor {
-            parallelism-min = %s
-            parallelism-max = %s
-            parallelism-factor = 1.0
-          }
-        }
         default-mailbox {
           mailbox-type = "akka.dispatch.SingleConsumerOnlyUnboundedMailbox"
         }
         prio-dispatcher {
-          mailbox-type = "%s"
+          mailbox-type = "akka.dispatch.SingleConsumerOnlyUnboundedMailbox"
         }
         typed {
           timeout = 10000s
         }
       }
     }
-                          """.format(corePoolSize, maxPoolSize, priorityMailboxType)
+                          """
 
     // println(customConfigStr)
 

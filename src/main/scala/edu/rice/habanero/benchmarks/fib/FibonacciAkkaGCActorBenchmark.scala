@@ -14,7 +14,7 @@ import java.util.concurrent.CountDownLatch
  *
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
  */
-object FibonacciGCActorBenchmark {
+object FibonacciAkkaGCActorBenchmark {
 
   def main(args: Array[String]) {
     BenchmarkRunner.runBenchmark(args, new FibonacciAkkaActorBenchmark)
