@@ -52,7 +52,7 @@ object CountingAkkaGCActorBenchmark {
     producer ! IncrementMessage()
     context.release(counter, producer)
 
-    override def process(msg: Message): Unit = ???
+    override def process(msg: Message): Unit = ()
   }
 
   trait Msg extends Message

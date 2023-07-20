@@ -74,7 +74,7 @@ object RadixSortAkkaGCActorBenchmark {
     sourceActor ! NextActorMessage(context.createRef(nextActor, sourceActor))
     context.release(sourceActor, nextActor)
 
-    override def process(msg: Msg): Unit = ???
+    override def process(msg: Msg): Unit = ()
   }
 
   private class IntSourceActor(numValues: Int, maxValue: Long, seed: Long, context: ActorContext[Msg]) extends GCActor[Msg](context) {
