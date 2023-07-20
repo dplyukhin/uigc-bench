@@ -94,11 +94,11 @@ object QuickSortAkkaActorBenchmark {
             val pivot = data.get(dataLengthHalf)
 
             val leftUnsorted = QuickSortConfig.filterLessThan(data, pivot)
-            val leftActor = context.system.actorOf(Props(new QuickSortActor(self, PositionLeft, null)))
+            val leftActor = context.actorOf(Props(new QuickSortActor(self, PositionLeft, null)))
             leftActor ! SortMessage(leftUnsorted)
 
             val rightUnsorted = QuickSortConfig.filterGreaterThan(data, pivot)
-            val rightActor = context.system.actorOf(Props(new QuickSortActor(self, PositionRight, null)))
+            val rightActor = context.actorOf(Props(new QuickSortActor(self, PositionRight, null)))
             rightActor ! SortMessage(rightUnsorted)
 
             result = QuickSortConfig.filterEqualsTo(data, pivot)

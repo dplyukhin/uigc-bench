@@ -54,7 +54,7 @@ object MatMulAkkaActorBenchmark {
 
     var i: Int = 0
     while (i < numWorkers) {
-      workers(i) = context.system.actorOf(Props(new Worker(self, i)))
+      workers(i) = context.actorOf(Props(new Worker(self, i)))
       i += 1
     }
 

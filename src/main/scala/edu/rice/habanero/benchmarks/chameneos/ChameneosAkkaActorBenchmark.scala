@@ -54,7 +54,7 @@ object ChameneosAkkaActorBenchmark {
     private def startChameneos() {
       Array.tabulate[ActorRef](numChameneos)(i => {
         val color = ChameneosHelper.Color.values()(i % 3)
-        val loopChamenos = context.system.actorOf(Props(new ChameneosChameneoActor(self, color, i)))
+        val loopChamenos = context.actorOf(Props(new ChameneosChameneoActor(self, color, i)))
         loopChamenos
       })
     }
