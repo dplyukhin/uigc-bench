@@ -108,7 +108,7 @@ object ApspAkkaGCActorBenchmark {
       context.release(blockActors(bi))
     }
 
-    override def process(msg: ApspMessage): Unit = ???
+    override def process(msg: ApspMessage): Unit = ()
   }
 
   private class ApspFloydWarshallActor(myBlockId: Int, blockSize: Int, graphSize: Int, initGraphData: Array[Array[Long]], latch: CountDownLatch, context: ActorContext[ApspMessage])
