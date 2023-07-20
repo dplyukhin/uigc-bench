@@ -1,15 +1,18 @@
 package edu.rice.habanero.benchmarks.nqueenk
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
+import akka.actor.typed.ActorSystem
+import edu.illinois.osl.akka.gc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.akka.gc.{ActorContext, ActorRef, Behaviors}
+import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
 import java.util.concurrent.CountDownLatch
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
  */
-object NQueensAkkaActorBenchmark {
+object NQueensAkkaGCActorBenchmark {
 
   def main(args: Array[String]) {
     BenchmarkRunner.runBenchmark(args, new NQueensAkkaActorBenchmark)
@@ -24,15 +27,13 @@ object NQueensAkkaActorBenchmark {
       NQueensConfig.printArgs()
     }
 
-    private var system: ActorSystem = _
+    private var system: ActorSystem[Msg] = _
     def runIteration() {
       val numWorkers: Int = NQueensConfig.NUM_WORKERS
       val priorities: Int = NQueensConfig.PRIORITIES
-      val master: Array[ActorRef] = Array(null)
 
-      system = AkkaActorState.newActorSystem("NQueens")
       val latch = new CountDownLatch(1)
-      master(0) = system.actorOf(Props(new Master(numWorkers, priorities, latch)))
+      system = AkkaActorState.newTypedActorSystem(Behaviors.setupRoot[Msg](ctx => new Master(numWorkers, priorities, latch, ctx)), "NQueens")
 
       latch.await()
 
@@ -48,32 +49,34 @@ object NQueensAkkaActorBenchmark {
     }
   }
 
-  trait Msg
-  case class WorkMessage(_priority: Int, data: Array[Int], depth: Int) extends Msg {
+  trait Msg extends Message
+  case class MasterMsg(master: ActorRef[Msg]) extends Msg {
+    override def refs: Iterable[RefobLike[Nothing]] = Some(master)
+  }
+  case class WorkMessage(_priority: Int, data: Array[Int], depth: Int) extends Msg with NoRefs {
     val priority = Math.min(NQueensConfig.PRIORITIES - 1, Math.max(0, _priority))
   }
-  case object ResultMessage extends Msg
-  case object DoneMessage extends Msg
-  case object StopMessage extends Msg
+  case object ResultMessage extends Msg with NoRefs
+  case object DoneMessage extends Msg with NoRefs
+  case object StopMessage extends Msg with NoRefs
 
   object Master {
     var resultCounter: Long = 0
   }
 
-  private class Master(numWorkers: Int, priorities: Int, latch: CountDownLatch) extends AkkaActor[AnyRef] {
+  private class Master(numWorkers: Int, priorities: Int, latch: CountDownLatch, context: ActorContext[Msg]) extends GCActor[Msg](context) {
 
     private val solutionsLimit = NQueensConfig.SOLUTIONS_LIMIT
-    private final val workers = new Array[ActorRef](numWorkers)
     private var messageCounter: Int = 0
     private var numWorkersTerminated: Int = 0
     private var numWorkSent: Int = 0
     private var numWorkCompleted: Int = 0
 
-    var i: Int = 0
-    while (i < numWorkers) {
-      workers(i) = context.actorOf(Props(new Worker(self, i)))
-      i += 1
+    private final val workers = ArrayBuffer.tabulate[ActorRef[Msg]](numWorkers) { i =>
+      context.spawnAnonymous(Behaviors.setup[Msg](ctx => new Worker(i, ctx)))
     }
+    for (worker <- workers)
+      worker ! MasterMsg(context.createRef(context.self, worker))
     val inArray: Array[Int] = new Array[Int](0)
     val workMessage = WorkMessage(priorities, inArray, 0)
     sendWork(workMessage)
@@ -84,7 +87,7 @@ object NQueensAkkaActorBenchmark {
       numWorkSent += 1
     }
 
-    override def process(theMsg: AnyRef) {
+    override def process(theMsg: Msg) {
       theMsg match {
         case workMessage: WorkMessage =>
           sendWork(workMessage)
@@ -116,18 +119,22 @@ object NQueensAkkaActorBenchmark {
     }
   }
 
-  private class Worker(master: ActorRef, id: Int) extends AkkaActor[AnyRef] {
+  private class Worker(id: Int, context: ActorContext[Msg]) extends GCActor[Msg](context) {
 
     private final val threshold: Int = NQueensConfig.THRESHOLD
     private final val size: Int = NQueensConfig.SIZE
+    private var master: ActorRef[Msg] = _
 
-    override def process(theMsg: AnyRef) {
+    override def process(theMsg: Msg) {
       theMsg match {
+        case MasterMsg(master) =>
+          this.master = master
         case workMessage: WorkMessage =>
           nqueensKernelPar(workMessage)
           master ! DoneMessage
         case StopMessage =>
           master ! theMsg
+          context.release(master)
           exit()
         case _ =>
       }

@@ -139,39 +139,4 @@ public final class NQueensConfig {
         P_LOWEST
     }
 
-    protected static class WorkMessage {
-        public final int priority;
-        public final int[] data;
-        public final int depth;
-
-        public WorkMessage(final int priority, final int[] data, final int depth) {
-            this.priority = Math.min(PRIORITIES - 1, Math.max(0, priority));
-            this.data = data;
-            this.depth = depth;
-        }
-    }
-
-    protected static final class DoneMessage {
-        protected static DoneMessage ONLY = new DoneMessage();
-
-        private DoneMessage() {
-            super();
-        }
-    }
-
-    protected static final class ResultMessage {
-        static ResultMessage ONLY = new ResultMessage();
-
-        protected ResultMessage() {
-            super();
-        }
-    }
-
-    protected static final class StopMessage {
-        protected static StopMessage ONLY = new StopMessage();
-
-        private StopMessage() {
-            super();
-        }
-    }
 }
