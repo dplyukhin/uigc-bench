@@ -7,7 +7,7 @@ import edu.rice.habanero.benchmarks.BenchmarkRunner;
  */
 public final class FibonacciConfig {
 
-    protected static int N = 25;
+    protected static int N = 26;
     protected static boolean debug = false;
 
     protected static void parseArgs(final String[] args) {

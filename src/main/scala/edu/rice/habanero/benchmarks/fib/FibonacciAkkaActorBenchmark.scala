@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.fib
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -25,19 +25,22 @@ object FibonacciAkkaActorBenchmark {
       FibonacciConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("Fibonacci")
+      system = AkkaActorState.newActorSystem("Fibonacci")
 
       val latch = new CountDownLatch(1)
       val fjRunner = system.actorOf(Props(new FibonacciActor(null, latch)))
       fjRunner ! Request(FibonacciConfig.N)
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      System.gc()
+      AkkaActorState.awaitTermination(system)
+      Thread.sleep(1000)
     }
   }
 
@@ -92,7 +95,7 @@ object FibonacciAkkaActorBenchmark {
         println(" Result = " + result)
       }
 
-      exit()
+      //exit()
     }
   }
 

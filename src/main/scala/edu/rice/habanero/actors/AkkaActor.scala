@@ -1,9 +1,10 @@
 package edu.rice.habanero.actors
 
 import java.util.concurrent.atomic.AtomicBoolean
-
 import akka.actor.{Actor, ActorRef, ActorSystem}
+import akka.actor.typed
 import com.typesafe.config.{Config, ConfigFactory}
+import edu.illinois.osl.akka.gc.{AbstractBehavior, ActorContext, Behavior, Behaviors}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -24,10 +25,6 @@ abstract class AkkaActor[MsgType] extends Actor {
 
   def process(msg: MsgType): Unit
 
-  def send(msg: MsgType) {
-    self ! msg
-  }
-
   final def exit() = {
     onPreExit()
     context.stop(self)
@@ -47,6 +44,39 @@ abstract class AkkaActor[MsgType] extends Actor {
   }
 }
 
+abstract class GCActor[MsgType](ctx: ActorContext[MsgType]) extends AbstractBehavior[MsgType](ctx) {
+  private var exiting: Boolean = false
+
+  final def onMessage(msg: MsgType): Behavior[MsgType] = {
+    process(msg)
+    if (exiting)
+      Behaviors.stopped(ctx)
+    else
+      this
+  }
+
+  def process(msg: MsgType): Unit
+
+  final def exit() = {
+    onPreExit()
+    exiting = true
+    onPostExit()
+  }
+
+  /**
+   * Convenience: specify code to be executed before actor is terminated
+   */
+  protected def onPreExit() = {
+  }
+
+  /**
+   * Convenience: specify code to be executed after actor is terminated
+   */
+  protected def onPostExit() = {
+  }
+
+}
+
 object AkkaActorState {
 
   private val mailboxTypeKey = "actors.mailboxType"
@@ -63,6 +93,10 @@ object AkkaActorState {
     val priorityMailboxType = getStringProp(mailboxTypeKey, "akka.dispatch.SingleConsumerOnlyUnboundedMailbox")
 
     val customConfigStr = """
+    my-pinned-dispatcher {
+      executor = "thread-pool-executor"
+      type = PinnedDispatcher
+    }
     akka {
       log-dead-letters-during-shutdown = off
       log-dead-letters = off
@@ -123,6 +157,20 @@ object AkkaActorState {
 
   def newActorSystem(name: String): ActorSystem = {
     ActorSystem(name, config)
+  }
+
+  def newTypedActorSystem[T](behavior: typed.Behavior[T], name: String): typed.ActorSystem[T] = {
+    typed.ActorSystem(behavior, name, config)
+  }
+
+  def awaitTermination(system: typed.ActorSystem[_]) {
+    try {
+      system.terminate()
+    } catch {
+      case ex: InterruptedException => {
+        ex.printStackTrace()
+      }
+    }
   }
 
   def awaitTermination(system: ActorSystem) {
