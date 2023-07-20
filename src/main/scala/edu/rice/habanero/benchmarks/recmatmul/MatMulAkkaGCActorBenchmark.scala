@@ -1,15 +1,18 @@
 package edu.rice.habanero.benchmarks.recmatmul
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
-import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
+import akka.actor.typed.ActorSystem
+import edu.illinois.osl.akka.gc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.akka.gc.{ActorContext, ActorRef, Behaviors}
+import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
+import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
 
 import java.util.concurrent.CountDownLatch
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
  */
-object MatMulAkkaActorBenchmark {
+object MatMulAkkaGCActorBenchmark {
 
   def main(args: Array[String]) {
     BenchmarkRunner.runBenchmark(args, new MatMulAkkaActorBenchmark)
@@ -24,13 +27,11 @@ object MatMulAkkaActorBenchmark {
       MatMulConfig.printArgs()
     }
 
-    private var system: ActorSystem = _
+    private var system: ActorSystem[Msg] = _
     def runIteration() {
 
-      system = AkkaActorState.newActorSystem("MatMul")
       val latch = new CountDownLatch(1)
-
-      val master = system.actorOf(Props(new Master(latch)))
+      system = AkkaActorState.newTypedActorSystem(Behaviors.setupRoot(ctx => new Master(latch, ctx)), "MatMul")
 
       latch.await()
     }
@@ -43,24 +44,26 @@ object MatMulAkkaActorBenchmark {
     }
   }
 
-  trait Msg
-  case object DoneMessage
-  case object StopMessage
-  case class WorkMessage(priority: Int, srA: Int, scA: Int, srB: Int, scB: Int, srC: Int, scC: Int, numBlocks: Int, dim: Int)
+  trait Msg extends Message
+  case class MasterMsg(master: ActorRef[Msg]) extends Msg {
+    override def refs: Iterable[RefobLike[Nothing]] = Some(master)
+  }
+  case object DoneMessage extends Msg with NoRefs
+  case object StopMessage extends Msg with NoRefs
+  case class WorkMessage(priority: Int, srA: Int, scA: Int, srB: Int, scB: Int, srC: Int, scC: Int, numBlocks: Int, dim: Int) extends Msg with NoRefs
 
-  private class Master(latch: CountDownLatch) extends AkkaActor[AnyRef] {
+  private class Master(latch: CountDownLatch, context: ActorContext[Msg]) extends GCActor[Msg](context) {
 
     private final val numWorkers: Int = MatMulConfig.NUM_WORKERS
-    private final val workers = new Array[ActorRef](numWorkers)
     private var numWorkersTerminated: Int = 0
     private var numWorkSent: Int = 0
     private var numWorkCompleted: Int = 0
 
-    var i: Int = 0
-    while (i < numWorkers) {
-      workers(i) = context.actorOf(Props(new Worker(self, i)))
-      i += 1
+    private final val workers = ArrayBuffer.tabulate[ActorRef[Msg]](numWorkers) {i =>
+      context.spawnAnonymous(Behaviors.setup[Msg](ctx => new Worker(i, ctx)))
     }
+    for (worker <- workers)
+      worker ! MasterMsg(context.createRef(context.self, worker))
 
     val dataLength: Int = MatMulConfig.DATA_LENGTH
     val numBlocks: Int = MatMulConfig.DATA_LENGTH * MatMulConfig.DATA_LENGTH
@@ -73,7 +76,7 @@ object MatMulAkkaActorBenchmark {
       numWorkSent += 1
     }
 
-    override def process(theMsg: AnyRef) {
+    override def process(theMsg: Msg) {
       theMsg match {
         case workMessage: WorkMessage =>
 
@@ -104,12 +107,15 @@ object MatMulAkkaActorBenchmark {
     }
   }
 
-  private class Worker(master: ActorRef, id: Int) extends AkkaActor[AnyRef] {
+  private class Worker(id: Int, context: ActorContext[Msg]) extends GCActor[Msg](context) {
 
     private final val threshold: Int = MatMulConfig.BLOCK_THRESHOLD
+    private var master: ActorRef[Msg] = _
 
-    override def process(theMsg: AnyRef) {
+    override def process(theMsg: Msg) {
       theMsg match {
+        case MasterMsg(master) =>
+          this.master = master
         case workMessage: WorkMessage =>
 
           myRecMat(workMessage)
