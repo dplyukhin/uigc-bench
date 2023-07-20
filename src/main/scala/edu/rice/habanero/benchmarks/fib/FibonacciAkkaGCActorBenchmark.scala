@@ -43,8 +43,6 @@ object FibonacciGCActorBenchmark {
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
       AkkaActorState.awaitTermination(system)
-      System.gc()
-      Thread.sleep(1000)
     }
   }
 

@@ -38,9 +38,7 @@ object FibonacciAkkaActorBenchmark {
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
-      System.gc()
       AkkaActorState.awaitTermination(system)
-      Thread.sleep(1000)
     }
   }
 
@@ -95,7 +93,7 @@ object FibonacciAkkaActorBenchmark {
         println(" Result = " + result)
       }
 
-      //exit()
+      exit()
     }
   }
 
