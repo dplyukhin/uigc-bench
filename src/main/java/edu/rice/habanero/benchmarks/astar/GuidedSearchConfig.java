@@ -260,41 +260,4 @@ public final class GuidedSearchConfig {
             return Math.sqrt((iDiff * iDiff) + (jDiff * jDiff) + (kDiff * kDiff));
         }
     }
-
-    protected static class WorkMessage {
-
-        public final GridNode node;
-        public final GridNode target;
-        public final int priority;
-
-        public WorkMessage(final GridNode node, final GridNode target) {
-            this.node = node;
-            this.target = target;
-            this.priority = priority(node);
-        }
-    }
-
-    protected static class ReceivedMessage {
-        protected static ReceivedMessage ONLY = new ReceivedMessage();
-
-        private ReceivedMessage() {
-            super();
-        }
-    }
-
-    protected static class DoneMessage {
-        protected static DoneMessage ONLY = new DoneMessage();
-
-        private DoneMessage() {
-            super();
-        }
-    }
-
-    protected static class StopMessage {
-        protected static StopMessage ONLY = new StopMessage();
-
-        private StopMessage() {
-            super();
-        }
-    }
 }

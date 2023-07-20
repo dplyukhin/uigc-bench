@@ -1,17 +1,20 @@
 package edu.rice.habanero.benchmarks.astar
 
-import java.util
-import akka.actor.{ActorRef, ActorSystem, Props}
-import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
-import edu.rice.habanero.benchmarks.astar.GuidedSearchConfig._
+import akka.actor.typed.ActorSystem
+import edu.illinois.osl.akka.gc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.akka.gc.{ActorContext, ActorRef, Behaviors}
+import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
+import edu.rice.habanero.benchmarks.astar.GuidedSearchConfig._
 
+import java.util
 import java.util.concurrent.CountDownLatch
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * @author <a href="http://shams.web.rice.edu/">Shams Imam</a> (shams@rice.edu)
  */
-object GuidedSearchAkkaActorBenchmark {
+object GuidedSearchAkkaGCActorBenchmark {
 
   def main(args: Array[String]) {
     BenchmarkRunner.runBenchmark(args, new GuidedSearchAkkaActorBenchmark)
@@ -26,13 +29,11 @@ object GuidedSearchAkkaActorBenchmark {
       GuidedSearchConfig.printArgs()
     }
 
-    private var system: ActorSystem = _
+    private var system: ActorSystem[Msg] = _
     def runIteration() {
 
-      system = AkkaActorState.newActorSystem("GuidedSearch")
-
       val latch = new CountDownLatch(1)
-      val master = system.actorOf(Props(new Master(latch)))
+      system = AkkaActorState.newTypedActorSystem(Behaviors.setupRoot(ctx => new Master(latch, ctx)), "GuidedSearch")
 
       latch.await()
 
@@ -48,25 +49,31 @@ object GuidedSearchAkkaActorBenchmark {
     }
   }
 
-  trait Msg
-  case class WorkMessage(node: GuidedSearchConfig.GridNode, target: GuidedSearchConfig.GridNode) extends Msg {
+  trait Msg extends Message
+  case class GetMaster(master: ActorRef[Msg]) extends Msg {
+    override def refs: Iterable[RefobLike[Nothing]] = Some(master)
+  }
+  case class WorkMessage(node: GuidedSearchConfig.GridNode, target: GuidedSearchConfig.GridNode) extends Msg with NoRefs {
     val priority: Int = GuidedSearchConfig.priority(node)
   }
-  case object ReceivedMessage extends Msg
-  case object DoneMessage extends Msg
-  case object StopMessage extends Msg
+  case object ReceivedMessage extends Msg with NoRefs
+  case object DoneMessage extends Msg with NoRefs
+  case object StopMessage extends Msg with NoRefs
 
-  private class Master(latch: CountDownLatch) extends AkkaActor[AnyRef] {
+
+  private class Master(latch: CountDownLatch, context: ActorContext[Msg]) extends GCActor[Msg](context) {
 
     private final val numWorkers = GuidedSearchConfig.NUM_WORKERS
-    private final val workers = new Array[ActorRef](numWorkers)
+    private final val workers = ArrayBuffer.tabulate[ActorRef[Msg]](numWorkers) { i =>
+      context.spawnAnonymous(Behaviors.setup(ctx => new Worker(i, ctx)))
+    }
     private var numWorkersTerminated: Int = 0
     private var numWorkSent: Int = 0
     private var numWorkCompleted: Int = 0
 
     var i: Int = 0
     while (i < numWorkers) {
-      workers(i) = context.actorOf(Props(new Worker(self, i)))
+      workers(i) ! GetMaster(context.createRef(context.self, workers(i)))
       i += 1
     }
     sendWork(new WorkMessage(originNode, targetNode))
@@ -77,7 +84,7 @@ object GuidedSearchAkkaActorBenchmark {
       workers(workerIndex) ! workMessage
     }
 
-    override def process(theMsg: AnyRef) {
+    override def process(theMsg: Msg) {
       theMsg match {
         case workMessage: WorkMessage =>
           sendWork(workMessage)
@@ -93,12 +100,14 @@ object GuidedSearchAkkaActorBenchmark {
     }
   }
 
-  private class Worker(master: ActorRef, id: Int) extends AkkaActor[AnyRef] {
-
+  private class Worker(id: Int, context: ActorContext[Msg]) extends GCActor[Msg](context) {
     private final val threshold = GuidedSearchConfig.THRESHOLD
+    private var master: ActorRef[Msg] = _
 
-    override def process(theMsg: AnyRef) {
+    override def process(theMsg: Msg) {
       theMsg match {
+        case GetMaster(master) =>
+          this.master = master
         case workMessage: WorkMessage =>
           search(workMessage)
           master ! ReceivedMessage
