@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.big
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.big.BigConfig.{ExitMessage, Message, PingMessage, PongMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
@@ -25,9 +25,10 @@ object BigAkkaActorBenchmark {
       BigConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("Big")
+      system = AkkaActorState.newActorSystem("Big")
 
       val sinkActor = system.actorOf(Props(new SinkActor(BigConfig.W)))
 
@@ -48,10 +49,10 @@ object BigAkkaActorBenchmark {
       })
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
     }
   }
 

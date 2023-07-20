@@ -1,7 +1,7 @@
 package edu.rice.habanero.benchmarks.quicksort
 
 import java.util
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -26,9 +26,10 @@ object QuickSortAkkaActorBenchmark {
       QuickSortConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("QuickSort")
+      system = AkkaActorState.newActorSystem("QuickSort")
       val latch = new CountDownLatch(1)
 
       val input = QuickSortConfig.randomlyInitArray()
@@ -37,10 +38,10 @@ object QuickSortAkkaActorBenchmark {
       rootActor ! SortMessage(input)
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
     }
   }
 

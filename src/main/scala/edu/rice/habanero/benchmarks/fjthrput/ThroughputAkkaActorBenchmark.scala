@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.fjthrput
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -25,9 +25,10 @@ object ThroughputAkkaActorBenchmark {
       ThroughputConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("Throughput")
+      system = AkkaActorState.newActorSystem("Throughput")
       val latch = new CountDownLatch(ThroughputConfig.A)
 
       val actors = Array.tabulate[ActorRef](ThroughputConfig.A)(i => {
@@ -48,10 +49,10 @@ object ThroughputAkkaActorBenchmark {
       }
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
     }
   }
 

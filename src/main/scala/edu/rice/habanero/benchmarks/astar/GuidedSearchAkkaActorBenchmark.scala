@@ -1,7 +1,7 @@
 package edu.rice.habanero.benchmarks.astar
 
 import java.util
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.astar.GuidedSearchConfig._
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -26,21 +26,22 @@ object GuidedSearchAkkaActorBenchmark {
       GuidedSearchConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("GuidedSearch")
+      system = AkkaActorState.newActorSystem("GuidedSearch")
 
       val latch = new CountDownLatch(1)
       val master = system.actorOf(Props(new Master(latch)))
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
 
       val nodesProcessed = GuidedSearchConfig.nodesProcessed()
       track("Nodes Processed", nodesProcessed)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
       val valid = GuidedSearchConfig.validate()
       printf(BenchmarkRunner.argOutputFormat, "Result valid", valid)
       GuidedSearchConfig.initializeData()

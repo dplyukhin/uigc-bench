@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.pingpong
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.pingpong.PingPongConfig.{Message, PingMessage, StartMessage, StopMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -26,9 +26,10 @@ object PingPongAkkaActorBenchmark {
       PingPongConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("PingPong")
+      system = AkkaActorState.newActorSystem("PingPong")
       val latch = new CountDownLatch(1)
 
       val pong = system.actorOf(Props(new PongActor()))
@@ -37,10 +38,10 @@ object PingPongAkkaActorBenchmark {
       ping ! StartMessage.ONLY
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
     }
   }
 

@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.nqueenk
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.nqueenk.NQueensConfig.{DoneMessage, ResultMessage, StopMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -25,17 +25,17 @@ object NQueensAkkaActorBenchmark {
       NQueensConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
       val numWorkers: Int = NQueensConfig.NUM_WORKERS
       val priorities: Int = NQueensConfig.PRIORITIES
       val master: Array[ActorRef] = Array(null)
 
-      val system = AkkaActorState.newActorSystem("NQueens")
+      system = AkkaActorState.newActorSystem("NQueens")
       val latch = new CountDownLatch(1)
       master(0) = system.actorOf(Props(new Master(numWorkers, priorities, latch)))
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
 
       val expSolution = NQueensConfig.SOLUTIONS(NQueensConfig.SIZE - 1)
       val actSolution = Master.resultCounter
@@ -44,6 +44,7 @@ object NQueensAkkaActorBenchmark {
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
       Master.resultCounter = 0
     }
   }

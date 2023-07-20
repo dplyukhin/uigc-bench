@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.threadring
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.threadring.ThreadRingConfig.{DataMessage, ExitMessage, PingMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -26,9 +26,10 @@ object ThreadRingAkkaActorBenchmark {
       ThreadRingConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("ThreadRing")
+      system = AkkaActorState.newActorSystem("ThreadRing")
       val latch = new CountDownLatch(1)
 
       val numActorsInRing = ThreadRingConfig.N
@@ -45,10 +46,10 @@ object ThreadRingAkkaActorBenchmark {
       ringActors(0) ! new PingMessage(ThreadRingConfig.R)
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
     }
   }
 

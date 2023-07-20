@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.recmatmul
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.recmatmul.MatMulConfig.{DoneMessage, StopMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -25,18 +25,19 @@ object MatMulAkkaActorBenchmark {
       MatMulConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("MatMul")
+      system = AkkaActorState.newActorSystem("MatMul")
       val latch = new CountDownLatch(1)
 
       val master = system.actorOf(Props(new Master(latch)))
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
       val isValid = MatMulConfig.valid()
       printf(BenchmarkRunner.argOutputFormat, "Result valid", isValid)
       MatMulConfig.initializeData()

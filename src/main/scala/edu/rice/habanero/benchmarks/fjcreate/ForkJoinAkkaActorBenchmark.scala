@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.fjcreate
 
-import akka.actor.Props
+import akka.actor.{ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -25,9 +25,10 @@ object ForkJoinAkkaActorBenchmark {
       ForkJoinConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("ForkJoin")
+      system = AkkaActorState.newActorSystem("ForkJoin")
       val latch = new CountDownLatch(ForkJoinConfig.N)
 
       val message = new Object()
@@ -39,10 +40,10 @@ object ForkJoinAkkaActorBenchmark {
       }
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
     }
   }
 

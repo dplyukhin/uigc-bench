@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.count
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -25,9 +25,10 @@ object CountingAkkaActorBenchmark {
       CountingConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("Counting")
+      system = AkkaActorState.newActorSystem("Counting")
       val latch = new CountDownLatch(1)
 
       val counter = system.actorOf(Props(new CountingActor()))
@@ -37,10 +38,10 @@ object CountingAkkaActorBenchmark {
       producer ! IncrementMessage()
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
     }
   }
 

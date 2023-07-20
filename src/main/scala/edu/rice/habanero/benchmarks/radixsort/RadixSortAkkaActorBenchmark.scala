@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.radixsort
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
 
@@ -24,9 +24,10 @@ object RadixSortAkkaActorBenchmark {
       RadixSortConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
-      val system = AkkaActorState.newActorSystem("RadixSort")
+      system = AkkaActorState.newActorSystem("RadixSort")
       val latch = new CountDownLatch(1)
 
       val validationActor = system.actorOf(Props(new ValidationActor(RadixSortConfig.N, latch)))
@@ -48,10 +49,10 @@ object RadixSortAkkaActorBenchmark {
       sourceActor ! NextActorMessage(nextActor)
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double) {
+      AkkaActorState.awaitTermination(system)
     }
   }
 

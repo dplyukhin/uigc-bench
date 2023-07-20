@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.apsp
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -27,6 +27,7 @@ object ApspAkkaActorBenchmark {
       ApspConfig.printArgs()
     }
 
+    private var system: ActorSystem = _
     def runIteration() {
 
       val graphData = ApspUtils.graphData
@@ -35,7 +36,7 @@ object ApspAkkaActorBenchmark {
 
       val numBlocksInSingleDim: Int = numNodes / blockSize
 
-      val system = AkkaActorState.newActorSystem("ForkJoin")
+      system = AkkaActorState.newActorSystem("ForkJoin")
       val latch = new CountDownLatch(numBlocksInSingleDim * numBlocksInSingleDim)
 
       // create and automatically the actors
@@ -76,10 +77,10 @@ object ApspAkkaActorBenchmark {
       }
 
       latch.await()
-      AkkaActorState.awaitTermination(system)
     }
 
     def cleanupIteration(lastIteration: Boolean, execTimeMillis: Double): Unit = {
+      AkkaActorState.awaitTermination(system)
       ApspUtils.generateGraph()
     }
   }
