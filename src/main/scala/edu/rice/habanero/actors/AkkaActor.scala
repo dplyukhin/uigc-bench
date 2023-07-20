@@ -45,21 +45,15 @@ abstract class AkkaActor[MsgType] extends Actor {
 }
 
 abstract class GCActor[MsgType](ctx: ActorContext[MsgType]) extends AbstractBehavior[MsgType](ctx) {
-  private var exiting: Boolean = false
-
   final def onMessage(msg: MsgType): Behavior[MsgType] = {
     process(msg)
-    if (exiting)
-      Behaviors.stopped(ctx)
-    else
-      this
+    this
   }
 
   def process(msg: MsgType): Unit
 
   final def exit() = {
     onPreExit()
-    exiting = true
     onPostExit()
   }
 
