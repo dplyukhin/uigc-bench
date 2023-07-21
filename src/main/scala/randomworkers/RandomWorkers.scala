@@ -1,10 +1,10 @@
 package randomworkers
 
+import akka.actor.typed.scaladsl
 import akka.actor.typed.scaladsl.TimerScheduler
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import common.{CborSerializable, ClusterBenchmark}
 import edu.illinois.osl.akka.gc.interfaces.{Message, NoRefs, RefobLike}
-import edu.illinois.osl.akka.gc.protocols.monotone.GCMessage
 import edu.illinois.osl.akka.gc.{AbstractBehavior, ActorContext, ActorFactory, ActorRef, Behavior, Behaviors, unmanaged}
 
 import scala.collection.mutable
@@ -14,7 +14,7 @@ import scala.concurrent.duration.DurationInt
 object RandomWorkers {
 
   trait Protocol extends CborSerializable with Message
-  private case class LearnPeers(peers: Seq[unmanaged.ActorRef[Protocol]]) extends Protocol {
+  private case class LearnPeers(peers: Seq[ActorRef[Protocol]]) extends Protocol {
     override def refs: Iterable[RefobLike[Nothing]] = peers
   }
   private case object Ping extends Protocol with NoRefs
@@ -23,88 +23,92 @@ object RandomWorkers {
     override def refs: Iterable[RefobLike[Nothing]] = workers
   }
 
+  private class Config() {
+    private val config = ConfigFactory.load("random-workers")
+    val reqsPerSecond = config.getInt("random-workers.")
+    val maxWorkSizeBytes = config.getInt("random-workers.")
+    val maxWorkDuration = config.getInt("random-workers.")
+    val maxAcqsInOneMsg = config.getInt("random-workers.")
+    val maxSendsInOneTurn = config.getInt("random-workers.")
+    val maxSpawnsInOneTurn = config.getInt("random-workers.")
+    val maxDeactivatedInOneTurn = config.getInt("random-workers.")
+    val managerProbSpawn = config.getDouble("random-workers.")
+    val managerProbLocalSend = config.getDouble("random-workers.")
+    val managerProbRemoteSend = config.getDouble("random-workers.")
+    val managerProbLocalAcquaint = config.getDouble("random-workers.")
+    val managerProbRemoteAcquaint = config.getDouble("random-workers.")
+    val managerProbPublishWorker = config.getDouble("random-workers.")
+    val managerProbDeactivate = config.getDouble("random-workers.")
+    val managerProbDeactivateAll = config.getDouble("random-workers.")
+    val workerProbSpawn = config.getDouble("random-workers.")
+    val workerProbSend = config.getDouble("random-workers.")
+    val workerProbAcquaint = config.getDouble("random-workers.")
+    val workerProbDeactivate = config.getDouble("random-workers.")
+    val workerProbDeactivateAll = config.getDouble("random-workers.")
+    val workerProbRetainData = config.getDouble("random-workers.")
+    val workerProbReleaseData = config.getDouble("random-workers.")
+  }
+
+  class Random() {
+
+    private val rng = new java.util.Random(System.currentTimeMillis())
+
+    def roll(probability: Double): Boolean =
+      rng.nextDouble(1.0) < probability
+
+    def genData(size: Int): Array[Byte] =
+      Array.tabulate[Byte](rng.nextInt(size))(i => i.toByte)
+
+    def select[T](items: Iterable[T]): T = {
+      val i = rng.nextInt(0, items.size)
+      items.view.slice(i, i + 1).head
+    }
+
+    def select[T](items: Iterable[T], bound: Int): Iterable[T] = {
+      if (items.isEmpty) return Nil
+      val numItems = rng.nextInt(0, bound + 1)
+      (1 to numItems).map(_ => select(items))
+    }
+
+    def randNat(bound: Int): Int =
+      rng.nextInt(0, bound)
+  }
+
   private object Manager {
-    class Cfg() {
-      private val config = ConfigFactory.load("random-workers")
-      val reqsPerSecond = config.getInt("random-workers.")
-      val maxWorkSizeBytes = config.getInt("random-workers.")
-      val maxWorkDuration = config.getInt("random-workers.")
-      val maxAcqsInOneMsg = config.getInt("random-workers.")
-      val maxSendsInOneTurn = config.getInt("random-workers.")
-      val maxSpawnsInOneTurn = config.getInt("random-workers.")
-      val maxDeactivatedInOneTurn = config.getInt("random-workers.")
-      val managerProbSpawn = config.getDouble("random-workers.")
-      val managerProbLocalSend = config.getDouble("random-workers.")
-      val managerProbRemoteSend = config.getDouble("random-workers.")
-      val managerProbLocalAcquaint = config.getDouble("random-workers.")
-      val managerProbRemoteAcquaint = config.getDouble("random-workers.")
-      val managerProbPublishWorker = config.getDouble("random-workers.")
-      val managerProbDeactivate = config.getDouble("random-workers.")
-      val managerProbDeactivateAll = config.getDouble("random-workers.")
-      val workerProbSpawn = config.getDouble("random-workers.")
-      val workerProbSend = config.getDouble("random-workers.")
-      val workerProbAcquaint = config.getDouble("random-workers.")
-      val workerProbDeactivate = config.getDouble("random-workers.")
-      val workerProbDeactivateAll = config.getDouble("random-workers.")
-      val workerProbRetainData = config.getDouble("random-workers.")
-      val workerProbReleaseData = config.getDouble("random-workers.")
-    }
 
-    class Random() {
-
-      private val rng = new java.util.Random(System.currentTimeMillis())
-
-      def roll(probability: Double): Boolean =
-        rng.nextDouble(1.0) < probability
-
-      def genData(size: Int): Array[Byte] =
-        Array.fill(rng.nextInt(size))(0)
-
-      def select[T](items: Iterable[T]): T = {
-        val i = rng.nextInt(0, items.size)
-        items.view.slice(i, i + 1).head
-      }
-
-      def select[T](items: Iterable[T], bound: Int): Iterable[T] = {
-        if (items.isEmpty) return Nil
-        val numItems = rng.nextInt(0, bound + 1)
-        (1 to numItems).map(_ => select(items))
-      }
-
-      def randNat(bound: Int): Int =
-        rng.nextInt(0, bound)
-
-      def coinFlip(): Int =
-        rng.nextBoolean()
-    }
-
-    def leader(
-               benchmark: ActorRef[ClusterBenchmark.Protocol[Protocol]],
+    def managerManager(
+               benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[Protocol]],
                workerNodes: Map[String, unmanaged.ActorRef[Protocol]],
                isWarmup: Boolean
-             ): unmanaged.Behavior[Protocol] =
-      Behaviors.setupRoot[Protocol] { ctx =>
+             ): unmanaged.Behavior[Protocol] = {
+      scaladsl.Behaviors.setup[Protocol] { ctx =>
+        // This actor manages the lead manager; it spawns the manager and then
+        // sends every manager a reference to every other manager.
         benchmark ! ClusterBenchmark.OrchestratorReady()
 
-        // TODO Need to get a version of this actor's actorref to add to the peers
-        // TODO Also nee
-        val peers = workerNodes.values.toSeq //:+ ctx.self.rawActorRef.unsafeUpcast[GCMessage[Protocol]]
+        val leader = ctx.spawnAnonymous(manager())
+
+        val peers = workerNodes.values.toSeq :+ leader
         for (peer <- peers)
-          peer ! LearnPeers(peers)
+          peer ! LearnPeers(peers.filter(_ != peer))
 
-        startManager(peers)
+        scaladsl.Behaviors.receiveMessage[Protocol] { _ =>
+          scaladsl.Behaviors.same
+        }
       }
+    }
 
-    private def startManager(peers: Seq[unmanaged.ActorRef[Protocol]]): unmanaged.Behavior[Protocol] =
+    def manager(): unmanaged.Behavior[Protocol] =
       Behaviors.withTimers[Protocol] { timers =>
-        val cfg = new Cfg()
-        timers.startTimerAtFixedRate((), Ping, (1000000000 / cfg.reqsPerSecond).nanos)
-        Behaviors.setupRoot[Protocol](ctx =>
-          new ManagerActor(ctx, timers, cfg)
-        )
+        val config = new Config()
+        timers.startTimerAtFixedRate((), Ping, (1000000000 / config.reqsPerSecond).nanos)
+
+        Behaviors.setupRoot[Protocol] { ctx =>
+          new ManagerActor(ctx, timers, config)
+        }
       }
 
-    private class ManagerActor(ctx: ActorContext[Protocol], timers: TimerScheduler[Protocol], config: Cfg) extends AbstractBehavior[Protocol](ctx) {
+    private class ManagerActor(ctx: ActorContext[Protocol], timers: TimerScheduler[Protocol], config: Config) extends AbstractBehavior[Protocol](ctx) {
 
       private val rng = new Random()
       private var peers: Seq[ActorRef[Protocol]] = Seq()
@@ -126,12 +130,12 @@ object RandomWorkers {
               localWorkers.add(ctx.spawnAnonymous(Worker()))
           }
           if (rng.roll(config.managerProbLocalSend) && localWorkers.nonEmpty) {
-            val work = Array.tabulate[Short](rng.randNat(config.maxWorkSizeBytes))(i => i.toShort)
+            val work = rng.genData(config.maxWorkSizeBytes)
             for (i <- 1 to rng.randNat(config.maxSendsInOneTurn))
               rng.select(localWorkers) ! Work(work)
           }
           if (rng.roll(config.managerProbRemoteSend) && remoteWorkers.nonEmpty) {
-            val work = Array.tabulate[Short](rng.randNat(config.maxWorkSizeBytes))(i => i.toShort)
+            val work = rng.genData(config.maxWorkSizeBytes)
             for (i <- 1 to rng.randNat(config.maxSendsInOneTurn))
               rng.select(remoteWorkers) ! Work(work)
           }
@@ -173,15 +177,6 @@ object RandomWorkers {
       }
     }
 
-    private def manage(
-                        config: Cfg,
-                        rng: Random,
-                        peers: Seq[ActorRef[Protocol]],
-                        localWorkers: ArrayBuffer[ActorRef[Protocol]] = new ArrayBuffer(),
-                        remoteWorkers: ArrayBuffer[ActorRef[Protocol]] = new ArrayBuffer(),
-                      ): Behavior[Protocol] =
-      Behaviors.receive { (ctx, msg) => msg match {
-      }}
   }
 
   object Worker {
@@ -192,17 +187,17 @@ object RandomWorkers {
 
     private class WorkerActor(ctx: ActorContext[Protocol]) extends AbstractBehavior[Protocol](ctx) {
       override def onMessage(msg: Protocol): Behavior[Protocol] = msg match {
-        case NewWork => this
+        case Ping => this
       }
     }
   }
 
   def main(args: Array[String]): Unit =
     ClusterBenchmark(
-      Manager.leader,
+      Manager.managerManager,
       Map(
-        "worker1" -> Manager.follower(),
-        "worker2" -> Manager.follower(),
+        "worker1" -> Manager.manager(),
+        "worker2" -> Manager.manager(),
       )
     ).runBenchmark(args)
 }
