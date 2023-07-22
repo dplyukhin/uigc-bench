@@ -185,7 +185,12 @@ class ClusterBenchmark[T](
         isWarmup: Boolean
     ): Behavior[Protocol[T]] = Behaviors.setup[Protocol[T]] { ctx =>
       ctx.system.receptionist ! Receptionist.Register(OrchestratorServiceKey, ctx.self)
-      waitForWorkerNodes(workerNodes = Map(), workerActors = Map(), iteration, readyLatch, doneLatch, isWarmup)
+      if (numWorkers > 0)
+        waitForWorkerNodes(workerNodes = Map(), workerActors = Map(), iteration, readyLatch, doneLatch, isWarmup)
+      else {
+        ctx.spawnAnonymous(orchestratorBehavior(ctx.self, Map(), isWarmup))
+        waitForOrchestrator(Map(), iteration, readyLatch, doneLatch, isWarmup)
+      }
     }
 
     /** When the benchmark is first started, the orchestrator node waits for all the worker nodes to
