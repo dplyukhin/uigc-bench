@@ -13,7 +13,7 @@ import scala.concurrent.duration.DurationInt
 object RandomWorkers {
 
   def main(args: Array[String]): Unit =
-    ClusterBenchmark(
+    ClusterBenchmark[SpawnProtocol.Command](
       Manager.leader,
       Map(
         "worker1" -> Manager.follower(),
@@ -143,7 +143,7 @@ object RandomWorkers {
   private object Manager {
 
     def leader(
-        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[Protocol]],
+        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[SpawnProtocol.Command]],
         workerNodes: Map[String, unmanaged.ActorRef[SpawnProtocol.Command]],
         isWarmup: Boolean
     ): unmanaged.Behavior[SpawnProtocol.Command] =
@@ -156,7 +156,7 @@ object RandomWorkers {
       }
 
     private def leadManager(
-        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[Protocol]],
+        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[SpawnProtocol.Command]],
         workerNodes: Iterable[unmanaged.ActorRef[SpawnProtocol.Command]]
     ): unmanaged.Behavior[Protocol] =
       Behaviors.withTimers[Protocol] { timers =>
@@ -183,7 +183,7 @@ object RandomWorkers {
         ctx: ActorContext[Protocol],
         config: Config,
         workerNodes: Iterable[unmanaged.ActorRef[SpawnProtocol.Command]],
-        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[Protocol]]
+        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[SpawnProtocol.Command]]
     ) extends AbstractBehavior[Protocol](ctx) {
 
       private val rng = new Random()
