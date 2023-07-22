@@ -10,29 +10,6 @@ import java.util.concurrent.CountDownLatch
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
-/** Cluster benchmarks follow this protocol.
-  *
-  * Part 1: Initialization.
-  *   1. Start up a system for the orchestrator and one for each worker. 2. The orchestrator system
-  *      publishes the name of its root actor. 3. Every worker system subscribes to the orchestrator
-  *      service key and waits for the orchestrator name.
-  *
-  * Part 2: Prepare for the iteration.
-  *   1. The orchestrator system asks every worker system to spawn its worker. 2. Every worker
-  *      system does so, and replies with a reference to its worker. 3. The orchestrator waits until
-  *      it has names for every worker in this iteration.
-  *
-  * Part 3: Run the iteration.
-  *   1. The orchestrator system starts the timer and spawns the orchestrator actor with references
-  *      to the workers. 2. The orchestrator runs until the protocol is done, then notifies its
-  *      parent to stop and terminates itself. 3. Workers should terminate themselves when they are
-  *      done with the protocol.
-  *
-  * Part 4: Cleanup.
-  *   1. The orchestrator system stops the timer. 2. If there are more iterations, proceed back to
-  *      Part 2.
-  */
-
 object ClusterBenchmark {
   /** A benchmark with only one actor per system */
   def apply[T](
@@ -60,6 +37,17 @@ object ClusterBenchmark {
     )
   }
 
+  private def dumpMeasurements(results: String, filename: String): Unit = {
+    if (filename == null) {
+      println("ERROR: Missing filename to dump iteration-specific measurements")
+    } else {
+      println(s"Writing measurements to $filename")
+      val writer = new BufferedWriter(new FileWriter(filename, true))
+      writer.write(results)
+      writer.close()
+    }
+  }
+
   private def dumpMeasurements(iterationTimes: Iterable[Double]): Unit = {
     val filename = System.getProperty("bench.filename")
     if (filename == null) {
@@ -81,7 +69,7 @@ object ClusterBenchmark {
   ) extends Protocol[T]
   case class ReceptionistListing[T](listing: Receptionist.Listing) extends Protocol[T]
   case class OrchestratorReady[T]() extends Protocol[T]
-  case class OrchestratorDone[T]() extends Protocol[T]
+  case class OrchestratorDone[T](results: String, filename: String) extends Protocol[T]
   case class IterationDone[T]() extends Protocol[T]
 }
 
@@ -146,7 +134,7 @@ class ClusterBenchmark[T](
       val system =
         if (role == "orchestrator")
           ActorSystem[Protocol[T]](
-            Orchestrator(readyLatch, doneLatch, isWarmup),
+            Orchestrator(readyLatch, doneLatch, i - warmupIterations, isWarmup),
             "ClusterSystem",
             config
           )
@@ -193,10 +181,11 @@ class ClusterBenchmark[T](
     def apply(
         readyLatch: CountDownLatch,
         doneLatch: CountDownLatch,
+        iteration: Int,
         isWarmup: Boolean
     ): Behavior[Protocol[T]] = Behaviors.setup[Protocol[T]] { ctx =>
       ctx.system.receptionist ! Receptionist.Register(OrchestratorServiceKey, ctx.self)
-      waitForWorkerNodes(workerNodes = Map(), workerActors = Map(), readyLatch, doneLatch, isWarmup)
+      waitForWorkerNodes(workerNodes = Map(), workerActors = Map(), iteration, readyLatch, doneLatch, isWarmup)
     }
 
     /** When the benchmark is first started, the orchestrator node waits for all the worker nodes to
@@ -205,6 +194,7 @@ class ClusterBenchmark[T](
     private def waitForWorkerNodes(
         workerNodes: Map[String, ActorRef[Protocol[T]]],
         workerActors: Map[String, Map[String, ActorRef[T]]],
+        iteration: Int,
         readyLatch: CountDownLatch,
         doneLatch: CountDownLatch,
         isWarmup: Boolean
@@ -215,10 +205,10 @@ class ClusterBenchmark[T](
             val newWorkerNodes = workerNodes + (role -> node)
             val newWorkerActors = workerActors + (role -> actors)
             if (newWorkerNodes.size < numWorkers)
-              waitForWorkerNodes(newWorkerNodes, newWorkerActors, readyLatch, doneLatch, isWarmup)
+              waitForWorkerNodes(newWorkerNodes, newWorkerActors, iteration, readyLatch, doneLatch, isWarmup)
             else {
               ctx.spawnAnonymous(orchestratorBehavior(ctx.self, newWorkerActors, isWarmup))
-              waitForOrchestrator(newWorkerNodes, readyLatch, doneLatch)
+              waitForOrchestrator(newWorkerNodes, iteration, readyLatch, doneLatch, isWarmup)
             }
         }
       }
@@ -229,14 +219,16 @@ class ClusterBenchmark[T](
       */
     private def waitForOrchestrator(
         workerNodes: Map[String, ActorRef[Protocol[T]]],
+        iteration: Int,
         readyLatch: CountDownLatch,
-        doneLatch: CountDownLatch
+        doneLatch: CountDownLatch,
+        isWarmup: Boolean
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
           case OrchestratorReady() =>
             readyLatch.countDown()
-            waitForIterationCompletion(workerNodes, doneLatch)
+            waitForIterationCompletion(workerNodes, iteration, doneLatch, isWarmup)
         }
       }
 
@@ -245,11 +237,15 @@ class ClusterBenchmark[T](
       */
     private def waitForIterationCompletion(
         workerNodes: Map[String, ActorRef[Protocol[T]]],
-        doneLatch: CountDownLatch
+        iteration: Int,
+        doneLatch: CountDownLatch,
+        isWarmup: Boolean
     ): Behavior[Protocol[T]] =
       Behaviors.receive { (_, msg) =>
         msg match {
-          case OrchestratorDone() =>
+          case OrchestratorDone(results, filename) =>
+            if (!isWarmup)
+              dumpMeasurements(results = results, filename = filename)
             doneLatch.countDown()
             for ((_, worker) <- workerNodes)
               worker ! IterationDone()
