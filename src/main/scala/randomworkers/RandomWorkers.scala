@@ -91,13 +91,14 @@ object RandomWorkers {
   }
 
   object Worker {
-    def apply(config: Config, rng: Random): ActorFactory[Protocol] =
+    def apply(config: Config): ActorFactory[Protocol] =
       Behaviors.setup[Protocol] { ctx =>
-        new WorkerActor(ctx, config, rng)
+        new WorkerActor(ctx, config)
       }
 
-    private class WorkerActor(ctx: ActorContext[Protocol], config: Config, rng: Random)
+    private class WorkerActor(ctx: ActorContext[Protocol], config: Config)
         extends AbstractBehavior[Protocol](ctx) {
+      private val rng = new Random()
       private val acquaintances: mutable.HashSet[ActorRef[Protocol]] = mutable.HashSet()
       private val state: Array[Byte] = Array.tabulate[Byte](config.maxWorkSizeBytes)(i => i.toByte)
 
@@ -115,7 +116,7 @@ object RandomWorkers {
             state(i) = (state(i) * work(i)).toByte
           if (rng.roll(config.workerProbSpawn)) {
             for (i <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
-              acquaintances.add(ctx.spawnAnonymous(Worker(config, rng)))
+              acquaintances.add(ctx.spawnAnonymous(Worker(config)))
           }
           if (rng.roll(config.workerProbSend) && acquaintances.nonEmpty) {
             val work = state
@@ -197,6 +198,7 @@ object RandomWorkers {
       private var queriesRemaining: Int = 0
       private val queryStartTimes: Array[Long] = Array.fill[Long](config.totalQueries)(-1)
       private val queryEndTimes: Array[Long] = Array.fill[Long](config.totalQueries)(-2)
+      private val isLeader = benchmark != null
 
       // Spawn the other managers and send those managers references to one another
       if (workerNodes.nonEmpty) {
@@ -217,6 +219,7 @@ object RandomWorkers {
 
         case Acquaint(workers) =>
           remoteWorkers.addAll(workers)
+          runActions()
           this
 
         case QueryResponse(id) =>
@@ -231,63 +234,68 @@ object RandomWorkers {
           this
 
         case Ping =>
-          if (rng.roll(config.managerProbSpawn)) {
-            for (_ <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
-              localWorkers.add(ctx.spawnAnonymous(Worker(config, rng)))
-          }
-          if (rng.roll(config.managerProbLocalSend) && localWorkers.nonEmpty) {
-            val work = rng.genData(config.maxWorkSizeBytes)
-            for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn))
-              rng.select(localWorkers) ! Work(work)
-          }
-          if (rng.roll(config.managerProbRemoteSend) && remoteWorkers.nonEmpty) {
-            val work = rng.genData(config.maxWorkSizeBytes)
-            for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn))
-              rng.select(remoteWorkers) ! Work(work)
-          }
-          if (rng.roll(config.managerProbLocalAcquaint) && localWorkers.nonEmpty) {
-            val acqs = rng.select(localWorkers, config.maxAcqsInOneMsg).toSeq
-            val owner = rng.select(localWorkers)
-            val refs = acqs.map(acq => ctx.createRef(acq, owner))
-            owner ! Acquaint(refs)
-          }
-          if (rng.roll(config.managerProbRemoteAcquaint) && localWorkers.nonEmpty) {
-            val acqs = rng.select(remoteWorkers, config.maxAcqsInOneMsg).toSeq
-            val owner = rng.select(localWorkers)
-            val refs = acqs.map(acq => ctx.createRef(acq, owner))
-            owner ! Acquaint(refs)
-          }
-          if (rng.roll(config.managerProbPublishWorker) && peers.nonEmpty) {
-            val acqs = rng.select(localWorkers, config.maxAcqsInOneMsg).toSeq
-            val peer = rng.select(peers)
-            val refs = acqs.map(acq => ctx.createRef(acq, peer))
-            peer ! Acquaint(refs)
-          }
-          if (rng.roll(config.managerProbQuery) && localWorkers.nonEmpty && queryID < config.totalQueries) {
-            val worker = rng.select(localWorkers)
-            worker ! Query(queryID, ctx.createRef(ctx.self, worker))
-            queryStartTimes(queryID) = System.nanoTime()
-            queryID += 1
-            queriesRemaining += 1
-          }
-          if (rng.roll(config.managerProbDeactivate)) {
-            val locals = rng.select(localWorkers, config.maxDeactivatedInOneTurn).toSeq
-            val remotes = rng.select(remoteWorkers, config.maxDeactivatedInOneTurn).toSeq
-            ctx.release(locals)
-            ctx.release(remotes)
-            for (worker <- locals)
-              localWorkers.remove(worker)
-            for (worker <- remotes)
-              remoteWorkers.remove(worker)
-          }
-          if (rng.roll(config.managerProbDeactivateAll)) {
-            ctx.release(localWorkers)
-            ctx.release(remoteWorkers)
-            localWorkers.clear()
-            remoteWorkers.clear()
-          }
+          runActions()
           this
       }
+
+      private def runActions(): Unit = {
+        if (rng.roll(config.managerProbSpawn)) {
+          for (_ <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
+            localWorkers.add(ctx.spawnAnonymous(Worker(config)))
+        }
+        if (rng.roll(config.managerProbLocalSend) && localWorkers.nonEmpty) {
+          val work = rng.genData(config.maxWorkSizeBytes)
+          for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn))
+            rng.select(localWorkers) ! Work(work)
+        }
+        if (rng.roll(config.managerProbRemoteSend) && remoteWorkers.nonEmpty) {
+          val work = rng.genData(config.maxWorkSizeBytes)
+          for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn))
+            rng.select(remoteWorkers) ! Work(work)
+        }
+        if (rng.roll(config.managerProbLocalAcquaint) && localWorkers.nonEmpty) {
+          val acqs = rng.select(localWorkers, config.maxAcqsInOneMsg).toSeq
+          val owner = rng.select(localWorkers)
+          val refs = acqs.map(acq => ctx.createRef(acq, owner))
+          owner ! Acquaint(refs)
+        }
+        if (rng.roll(config.managerProbRemoteAcquaint) && localWorkers.nonEmpty) {
+          val acqs = rng.select(remoteWorkers, config.maxAcqsInOneMsg).toSeq
+          val owner = rng.select(localWorkers)
+          val refs = acqs.map(acq => ctx.createRef(acq, owner))
+          owner ! Acquaint(refs)
+        }
+        if (rng.roll(config.managerProbPublishWorker) && peers.nonEmpty) {
+          val acqs = rng.select(localWorkers, config.maxAcqsInOneMsg).toSeq
+          val peer = rng.select(peers)
+          val refs = acqs.map(acq => ctx.createRef(acq, peer))
+          peer ! Acquaint(refs)
+        }
+        if (rng.roll(config.managerProbQuery) && isLeader && localWorkers.nonEmpty && queryID < config.totalQueries) {
+          val worker = rng.select(localWorkers)
+          worker ! Query(queryID, ctx.createRef(ctx.self, worker))
+          queryStartTimes(queryID) = System.nanoTime()
+          queryID += 1
+          queriesRemaining += 1
+        }
+        if (rng.roll(config.managerProbDeactivate)) {
+          val locals = rng.select(localWorkers, config.maxDeactivatedInOneTurn).toSeq
+          val remotes = rng.select(remoteWorkers, config.maxDeactivatedInOneTurn).toSeq
+          ctx.release(locals)
+          ctx.release(remotes)
+          for (worker <- locals)
+            localWorkers.remove(worker)
+          for (worker <- remotes)
+            remoteWorkers.remove(worker)
+        }
+        if (rng.roll(config.managerProbDeactivateAll)) {
+          ctx.release(localWorkers)
+          ctx.release(remoteWorkers)
+          localWorkers.clear()
+          remoteWorkers.clear()
+        }
+      }
+
     }
   }
 }
