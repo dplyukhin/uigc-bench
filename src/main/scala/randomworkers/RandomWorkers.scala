@@ -1,6 +1,6 @@
 package randomworkers
 
-import akka.actor.typed.{SpawnProtocol, scaladsl}
+import akka.actor.typed.scaladsl
 import com.typesafe.config.ConfigFactory
 import common.ClusterBenchmark.OrchestratorDone
 import common.{CborSerializable, ClusterBenchmark}
@@ -13,11 +13,11 @@ import scala.concurrent.duration.DurationInt
 object RandomWorkers {
 
   def main(args: Array[String]): Unit =
-    ClusterBenchmark[SpawnProtocol.Command](
+    ClusterBenchmark[RemoteSpawner.Command[Protocol]](
       Manager.leader,
       Map(
-        "worker1" -> Manager.follower(),
-        "worker2" -> Manager.follower()
+        "manager1" -> Manager.spawnPoint(),
+        //"manager2" -> Manager.follower()
       )
     ).runBenchmark(args)
 
@@ -65,6 +65,7 @@ object RandomWorkers {
   private case class QueryResponse(n: Int) extends Protocol with NoRefs
 
   private class Config() {
+    private val config = ConfigFactory.load("random-workers")
     val reqsPerSecond = config.getInt("random-workers.reqs-per-second")
     val maxWorkSizeBytes = config.getInt("random-workers.max-work-size-in-bytes")
     val maxAcqsInOneMsg = config.getInt("random-workers.max-acqs-per-msg")
@@ -87,7 +88,6 @@ object RandomWorkers {
     val workerProbAcquaint = config.getDouble("random-workers.wrk-probabilities.acquaint")
     val workerProbDeactivate = config.getDouble("random-workers.wrk-probabilities.deactivate")
     val workerProbDeactivateAll = config.getDouble("random-workers.wrk-probabilities.deactivate-all")
-    private val config = ConfigFactory.load("random-workers")
   }
 
   object Worker {
@@ -105,6 +105,11 @@ object RandomWorkers {
         case Acquaint(workers) =>
           acquaintances.addAll(workers)
           this
+
+        case Query(n, master) =>
+          master ! QueryResponse(n)
+          this
+
         case Work(work) =>
           for (i <- work.indices)
             state(i) = (state(i) * work(i)).toByte
@@ -143,21 +148,21 @@ object RandomWorkers {
   private object Manager {
 
     def leader(
-        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[SpawnProtocol.Command]],
-        workerNodes: Map[String, unmanaged.ActorRef[SpawnProtocol.Command]],
+        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[RemoteSpawner.Command[Protocol]]],
+        workerNodes: Map[String, unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
         isWarmup: Boolean
-    ): unmanaged.Behavior[SpawnProtocol.Command] =
-      scaladsl.Behaviors.setup[SpawnProtocol.Command] { ctx =>
+    ): unmanaged.Behavior[RemoteSpawner.Command[Protocol]] =
+      scaladsl.Behaviors.setup[RemoteSpawner.Command[Protocol]] { ctx =>
         benchmark ! ClusterBenchmark.OrchestratorReady()
 
         ctx.spawn(leadManager(benchmark, workerNodes.values), "manager0")
 
-        SpawnProtocol()
+        spawnPoint()
       }
 
     private def leadManager(
-        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[SpawnProtocol.Command]],
-        workerNodes: Iterable[unmanaged.ActorRef[SpawnProtocol.Command]]
+        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[RemoteSpawner.Command[Protocol]]],
+        workerNodes: Iterable[unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]]
     ): unmanaged.Behavior[Protocol] =
       Behaviors.withTimers[Protocol] { timers =>
         val config = new Config()
@@ -168,22 +173,20 @@ object RandomWorkers {
         }
       }
 
-    def follower(): unmanaged.Behavior[SpawnProtocol.Command] =
-      scaladsl.Behaviors.setup[SpawnProtocol.Command] { _ =>
-        SpawnProtocol()
-      }
-
-    private def followerManager(): ActorFactory[Protocol] =
-      Behaviors.setup[Protocol] { ctx =>
-        val config = new Config()
-        new ManagerActor(ctx, config, Nil, null)
-      }
+    def spawnPoint(): unmanaged.Behavior[RemoteSpawner.Command[Protocol]] =
+      RemoteSpawner(Map(
+        "followerManager" ->
+          (ctx => {
+            val config = new Config()
+            new ManagerActor(ctx, config, Nil, null)
+          })
+      ))
 
     private class ManagerActor(
         ctx: ActorContext[Protocol],
         config: Config,
-        workerNodes: Iterable[unmanaged.ActorRef[SpawnProtocol.Command]],
-        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[SpawnProtocol.Command]]
+        workerNodes: Iterable[unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
+        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[RemoteSpawner.Command[Protocol]]]
     ) extends AbstractBehavior[Protocol](ctx) {
 
       private val rng = new Random()
@@ -198,7 +201,8 @@ object RandomWorkers {
       // Spawn the other managers and send those managers references to one another
       if (workerNodes.nonEmpty) {
         peers = (for ((node, i) <- workerNodes.zipWithIndex)
-          yield ctx.spawnRemote(followerManager(), node, s"manager${i + 1}")).toSeq
+          yield ctx.spawnRemote("followerManager", node)
+        ).toSeq
         for (peer <- peers) {
           val refs =
             (peers :+ ctx.self).filter(_ != peer).map(target => ctx.createRef(target, peer))
