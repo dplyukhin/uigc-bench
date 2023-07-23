@@ -21,7 +21,7 @@ object RandomWorkers {
       )
     ).runBenchmark(args)
 
-  trait Protocol extends CborSerializable with Message
+  trait Protocol extends Serializable with Message
 
   class Random() {
 
