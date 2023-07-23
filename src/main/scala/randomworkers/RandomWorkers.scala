@@ -1,6 +1,6 @@
 package randomworkers
 
-import akka.actor.typed.scaladsl
+import akka.actor.typed.{PostStop, Signal, scaladsl}
 import com.typesafe.config.ConfigFactory
 import common.ClusterBenchmark.OrchestratorDone
 import common.{CborSerializable, ClusterBenchmark}
@@ -33,22 +33,22 @@ object RandomWorkers {
     def genData(size: Int): Array[Byte] =
       Array.tabulate[Byte](rng.nextInt(size))(i => i.toByte)
 
-    def select[T](items: Iterable[T], bound: Int): Iterable[T] = {
+    def select[T](items: mutable.ArrayBuffer[T], bound: Int): Iterable[T] = {
       if (items.isEmpty) return Nil
       val numItems = rng.nextInt(0, bound + 1)
       (1 to numItems).map(_ => select(items))
     }
 
-    def select[T](items: Iterable[T]): T = {
+    def select[T](items: mutable.ArrayBuffer[T]): T = {
       val i = rng.nextInt(0, items.size)
-      items.view.slice(i, i + 1).head
+      items(i)
     }
 
     def randNat(bound: Int): Int =
       rng.nextInt(0, bound)
   }
 
-  private case class LearnPeers(peers: Seq[ActorRef[Protocol]]) extends Protocol {
+  private case class LearnPeers(peers: mutable.ArrayBuffer[ActorRef[Protocol]]) extends Protocol {
     override def refs: Iterable[RefobLike[Nothing]] = peers
   }
 
@@ -90,6 +90,12 @@ object RandomWorkers {
     val workerProbDeactivateAll = config.getDouble("random-workers.wrk-probabilities.deactivate-all")
   }
 
+  def remove(ref: ActorRef[Protocol], buf: mutable.ArrayBuffer[ActorRef[Protocol]]): Unit = {
+    val i = buf.indexOf(ref)
+    if (i != -1)
+      buf.remove(i)
+  }
+
   object Worker {
     def apply(config: Config): ActorFactory[Protocol] =
       Behaviors.setup[Protocol] { ctx =>
@@ -99,7 +105,7 @@ object RandomWorkers {
     private class WorkerActor(ctx: ActorContext[Protocol], config: Config)
         extends AbstractBehavior[Protocol](ctx) {
       private val rng = new Random()
-      private val acquaintances: mutable.HashSet[ActorRef[Protocol]] = mutable.HashSet()
+      private val acquaintances: mutable.ArrayBuffer[ActorRef[Protocol]] = new mutable.ArrayBuffer()
       private val state: Array[Byte] = Array.tabulate[Byte](config.maxWorkSizeBytes)(i => i.toByte)
 
       override def onMessage(msg: Protocol): Behavior[Protocol] = msg match {
@@ -116,7 +122,7 @@ object RandomWorkers {
             state(i) = (state(i) * work(i)).toByte
           if (rng.roll(config.workerProbSpawn)) {
             for (i <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
-              acquaintances.add(ctx.spawnAnonymous(Worker(config)))
+              acquaintances.append(ctx.spawnAnonymous(Worker(config)))
           }
           if (rng.roll(config.workerProbSend) && acquaintances.nonEmpty) {
             val work = state
@@ -133,7 +139,7 @@ object RandomWorkers {
             val locals = rng.select(acquaintances, config.maxDeactivatedInOneTurn).toSeq
             ctx.release(locals)
             for (worker <- locals)
-              acquaintances.remove(worker)
+              remove(worker, acquaintances)
           }
           if (rng.roll(config.workerProbDeactivateAll)) {
             ctx.release(acquaintances)
@@ -191,20 +197,22 @@ object RandomWorkers {
     ) extends AbstractBehavior[Protocol](ctx) {
 
       private val rng = new Random()
-      private val localWorkers: mutable.HashSet[ActorRef[Protocol]] = mutable.HashSet()
-      private val remoteWorkers: mutable.HashSet[ActorRef[Protocol]] = mutable.HashSet()
-      private var peers: Seq[ActorRef[Protocol]] = Seq()
+      private val localWorkers: mutable.ArrayBuffer[ActorRef[Protocol]] = mutable.ArrayBuffer()
+      private val remoteWorkers: mutable.ArrayBuffer[ActorRef[Protocol]] = mutable.ArrayBuffer()
+      private var peers: mutable.ArrayBuffer[ActorRef[Protocol]] = mutable.ArrayBuffer()
       private var queryID: Int = 0
       private var queriesRemaining: Int = 0
       private val queryStartTimes: Array[Long] = Array.fill[Long](config.totalQueries)(-1)
       private val queryEndTimes: Array[Long] = Array.fill[Long](config.totalQueries)(-2)
       private val isLeader = benchmark != null
+      private var done = false
 
       // Spawn the other managers and send those managers references to one another
       if (workerNodes.nonEmpty) {
-        peers = (for ((node, i) <- workerNodes.zipWithIndex)
-          yield ctx.spawnRemote("followerManager", node)
-        ).toSeq
+        peers = mutable.ArrayBuffer.from(
+          for ((node, i) <- workerNodes.zipWithIndex)
+            yield ctx.spawnRemote("followerManager", node)
+        )
         for (peer <- peers) {
           val refs =
             (peers :+ ctx.self).filter(_ != peer).map(target => ctx.createRef(target, peer))
@@ -230,6 +238,11 @@ object RandomWorkers {
               queryEndTimes(i) - queryStartTimes(i)
             }
             benchmark ! OrchestratorDone(results = queryTimes.mkString("\n"), filename = config.queryTimesFile)
+            done = true
+            ctx.release(localWorkers)
+            ctx.release(remoteWorkers)
+            localWorkers.clear()
+            remoteWorkers.clear()
           }
           this
 
@@ -239,9 +252,10 @@ object RandomWorkers {
       }
 
       private def runActions(): Unit = {
+        if (done) return
         if (rng.roll(config.managerProbSpawn)) {
           for (_ <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
-            localWorkers.add(ctx.spawnAnonymous(Worker(config)))
+            localWorkers.append(ctx.spawnAnonymous(Worker(config)))
         }
         if (rng.roll(config.managerProbLocalSend) && localWorkers.nonEmpty) {
           val work = rng.genData(config.maxWorkSizeBytes)
@@ -284,9 +298,10 @@ object RandomWorkers {
           ctx.release(locals)
           ctx.release(remotes)
           for (worker <- locals)
-            localWorkers.remove(worker)
-          for (worker <- remotes)
-            remoteWorkers.remove(worker)
+            remove(worker, localWorkers)
+          for (worker <- remotes) {
+            remove(worker, remoteWorkers)
+          }
         }
         if (rng.roll(config.managerProbDeactivateAll)) {
           ctx.release(localWorkers)

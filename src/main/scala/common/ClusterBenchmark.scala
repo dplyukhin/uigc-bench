@@ -163,6 +163,7 @@ class ClusterBenchmark[T](
       // Clean up the system for another iteration
       system.terminate()
       Await.ready(system.whenTerminated, Duration.Inf)
+      System.gc()
       Thread.sleep(10000) // Wait for the partner to shutdown too
     }
 
