@@ -28,24 +28,24 @@ object RandomWorkers {
     private val rng = new java.util.Random(System.currentTimeMillis())
 
     def roll(probability: Double): Boolean =
-      rng.nextDouble(1.0) < probability
+      rng.nextDouble() < probability
 
     def genData(size: Int): Array[Byte] =
       Array.tabulate[Byte](rng.nextInt(size))(i => i.toByte)
 
     def select[T](items: mutable.ArrayBuffer[T], bound: Int): Iterable[T] = {
       if (items.isEmpty) return Nil
-      val numItems = rng.nextInt(0, bound + 1)
+      val numItems = rng.nextInt(bound + 1)
       (1 to numItems).map(_ => select(items))
     }
 
     def select[T](items: mutable.ArrayBuffer[T]): T = {
-      val i = rng.nextInt(0, items.size)
+      val i = rng.nextInt(items.size)
       items(i)
     }
 
     def randNat(bound: Int): Int =
-      rng.nextInt(0, bound)
+      rng.nextInt(bound)
   }
 
   private case class LearnPeers(peers: mutable.ArrayBuffer[ActorRef[Protocol]]) extends Protocol {
