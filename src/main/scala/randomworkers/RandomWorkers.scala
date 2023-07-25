@@ -17,7 +17,7 @@ object RandomWorkers {
       Manager.leader,
       Map(
         "manager1" -> Manager.spawnPoint(),
-        //"manager2" -> Manager.follower()
+        "manager2" -> Manager.spawnPoint()
       )
     ).runBenchmark(args)
 
