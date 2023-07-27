@@ -30,8 +30,18 @@ object RandomWorkers {
     def roll(probability: Double): Boolean =
       rng.nextDouble() < probability
 
-    def genData(size: Int): Array[Byte] =
-      Array.tabulate[Byte](rng.nextInt(size))(i => i.toByte)
+    def genData(size: Int): List[Int] =
+      List.tabulate(rng.nextInt(size))(i => i)
+
+    def selectDistinct[T](items: mutable.ArrayBuffer[T], bound: Int, chosen: Set[Any] = Set()): Iterable[T] = {
+      if (items.isEmpty) return Nil
+      if (bound == 0) return chosen.asInstanceOf[Iterable[T]]
+      val item = select(items)
+      if (chosen contains item)
+        selectDistinct(items, bound - 1, chosen)
+      else
+        selectDistinct(items, bound - 1, chosen + item)
+    }
 
     def select[T](items: mutable.ArrayBuffer[T], bound: Int): Iterable[T] = {
       if (items.isEmpty) return Nil
@@ -52,7 +62,7 @@ object RandomWorkers {
     override def refs: Iterable[RefobLike[Nothing]] = peers
   }
 
-  private case class Work(work: Array[Byte]) extends Protocol with NoRefs
+  private case class Work(work: List[Int]) extends Protocol with NoRefs
 
   private case class Acquaint(workers: Seq[ActorRef[Protocol]]) extends Protocol {
     override def refs: Iterable[RefobLike[Nothing]] = workers
@@ -106,7 +116,7 @@ object RandomWorkers {
         extends AbstractBehavior[Protocol](ctx) {
       private val rng = new Random()
       private val acquaintances: mutable.ArrayBuffer[ActorRef[Protocol]] = new mutable.ArrayBuffer()
-      private val state: Array[Byte] = Array.tabulate[Byte](config.maxWorkSizeBytes)(i => i.toByte)
+      private var state: List[Int] = List.tabulate(config.maxWorkSizeBytes / 4)(i => i)
 
       override def onMessage(msg: Protocol): Behavior[Protocol] = msg match {
         case Acquaint(workers) =>
@@ -118,8 +128,7 @@ object RandomWorkers {
           this
 
         case Work(work) =>
-          for (i <- work.indices)
-            state(i) = (state(i) * work(i)).toByte
+          state = state ++ work
           if (rng.roll(config.workerProbSpawn)) {
             for (i <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
               acquaintances.append(ctx.spawnAnonymous(Worker(config)))
@@ -136,7 +145,7 @@ object RandomWorkers {
             owner ! Acquaint(refs)
           }
           if (rng.roll(config.workerProbDeactivate)) {
-            val locals = rng.select(acquaintances, config.maxDeactivatedInOneTurn).toSeq
+            val locals = rng.selectDistinct(acquaintances, config.maxDeactivatedInOneTurn).toSeq
             ctx.release(locals)
             for (worker <- locals)
               remove(worker, acquaintances)
@@ -258,12 +267,12 @@ object RandomWorkers {
             localWorkers.append(ctx.spawnAnonymous(Worker(config)))
         }
         if (rng.roll(config.managerProbLocalSend) && localWorkers.nonEmpty) {
-          val work = rng.genData(config.maxWorkSizeBytes)
+          val work = rng.genData(config.maxWorkSizeBytes / 4)
           for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn))
             rng.select(localWorkers) ! Work(work)
         }
         if (rng.roll(config.managerProbRemoteSend) && remoteWorkers.nonEmpty) {
-          val work = rng.genData(config.maxWorkSizeBytes)
+          val work = rng.genData(config.maxWorkSizeBytes / 4)
           for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn))
             rng.select(remoteWorkers) ! Work(work)
         }
@@ -293,8 +302,8 @@ object RandomWorkers {
           queriesRemaining += 1
         }
         if (rng.roll(config.managerProbDeactivate)) {
-          val locals = rng.select(localWorkers, config.maxDeactivatedInOneTurn).toSeq
-          val remotes = rng.select(remoteWorkers, config.maxDeactivatedInOneTurn).toSeq
+          val locals = rng.selectDistinct(localWorkers, config.maxDeactivatedInOneTurn).toSeq
+          val remotes = rng.selectDistinct(remoteWorkers, config.maxDeactivatedInOneTurn).toSeq
           ctx.release(locals)
           ctx.release(remotes)
           for (worker <- locals)
