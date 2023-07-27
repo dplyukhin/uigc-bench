@@ -82,6 +82,7 @@ object RandomWorkers {
     val maxSendsInOneTurn = config.getInt("random-workers.max-sends-per-turn")
     val maxSpawnsInOneTurn = config.getInt("random-workers.max-spawns-per-turn")
     val maxDeactivatedInOneTurn = config.getInt("random-workers.max-deactivated-per-turn")
+    val managerMaxAcquaintances = config.getInt("random-workers.manager-max-acquaintances")
     val totalQueries = config.getInt("random-workers.total-queries")
     val queryTimesFile = config.getString("random-workers.query-times-file")
     val managerProbSpawn = config.getDouble("random-workers.mgr-probabilities.spawn")
@@ -312,7 +313,8 @@ object RandomWorkers {
             remove(worker, remoteWorkers)
           }
         }
-        if (rng.roll(config.managerProbDeactivateAll)) {
+        if (rng.roll(config.managerProbDeactivateAll)
+          || localWorkers.size + remoteWorkers.size > config.managerMaxAcquaintances) {
           ctx.release(localWorkers)
           ctx.release(remoteWorkers)
           localWorkers.clear()
