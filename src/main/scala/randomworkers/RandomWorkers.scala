@@ -16,8 +16,8 @@ object RandomWorkers {
     ClusterBenchmark[RemoteSpawner.Command[Protocol]](
       Manager.leader,
       Map(
-        "manager1" -> Manager.spawnPoint(),
-        "manager2" -> Manager.spawnPoint()
+        //"manager1" -> Manager.spawnPoint(),
+        //"manager2" -> Manager.spawnPoint()
       )
     ).runBenchmark(args)
 
@@ -129,7 +129,7 @@ object RandomWorkers {
           this
 
         case Work(work) =>
-          state = state ++ work
+          state = state.zip(work).map{case (a,b) => a + b}
           if (rng.roll(config.workerProbSpawn)) {
             for (i <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
               acquaintances.append(ctx.spawnAnonymous(Worker(config)))
