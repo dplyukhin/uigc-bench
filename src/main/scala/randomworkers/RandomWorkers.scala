@@ -16,8 +16,8 @@ object RandomWorkers {
     ClusterBenchmark[RemoteSpawner.Command[Protocol]](
       Manager.leader,
       Map(
-        //"manager1" -> Manager.spawnPoint(),
-        //"manager2" -> Manager.spawnPoint()
+        "manager1" -> Manager.spawnPoint(),
+        "manager2" -> Manager.spawnPoint()
       )
     ).runBenchmark(args)
 
