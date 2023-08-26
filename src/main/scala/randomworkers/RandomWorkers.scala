@@ -4,8 +4,8 @@ import akka.actor.typed.{PostStop, Signal, scaladsl}
 import com.typesafe.config.ConfigFactory
 import common.ClusterBenchmark.OrchestratorDone
 import common.{CborSerializable, ClusterBenchmark}
-import edu.illinois.osl.akka.gc.interfaces.{Message, NoRefs, RefobLike}
-import edu.illinois.osl.akka.gc._
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc._
 
 import scala.collection.mutable
 import scala.concurrent.duration.DurationInt

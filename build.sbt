@@ -1,6 +1,6 @@
 val org = "edu.illinois.osl"
 val libVersion = "0.1.0-SNAPSHOT"
-val akkaVersion = "0.0.0+26633-a0763208-SNAPSHOT" // "2.8.0-M3+11-a0763208-SNAPSHOT" // "2.6.3"
+val akkaVersion = "2.8.0-M3+18-6fadd9a8+20230727-1556-SNAPSHOT"
 
 ThisBuild / scalaVersion     := "2.13.8"
 ThisBuild / version          := libVersion
@@ -8,10 +8,10 @@ ThisBuild / organization     := org
 
 lazy val bench = (project in file("."))
   .settings(
-    name := "akka-gc-bench",
+    name := "uigc-bench",
 
     libraryDependencies ++= Seq(
-        org %% "akka-gc" % libVersion,
+        org %% "uigc" % libVersion,
         "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
         "com.typesafe.akka" %% "akka-cluster-typed" % akkaVersion,
         "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion,

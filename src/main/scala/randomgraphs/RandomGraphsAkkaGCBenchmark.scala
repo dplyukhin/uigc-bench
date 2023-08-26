@@ -1,9 +1,9 @@
 package randomgraphs
 
 import akka.actor.typed.{ActorSystem, Behavior => AkkaBehavior}
-import edu.illinois.osl.akka.gc._
-import edu.illinois.osl.akka.gc.protocol._
-import edu.illinois.osl.akka.gc.interfaces.{Message, NoRefs}
+import edu.illinois.osl.uigc._
+import edu.illinois.osl.uigc.protocol._
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs}
 import common.Benchmark
 
 import scala.concurrent.Await
