@@ -1,8 +1,8 @@
 package edu.rice.habanero.benchmarks.apsp
 
 import akka.actor.typed.ActorSystem
-import edu.illinois.osl.akka.gc.interfaces.{Message, NoRefs, RefobLike}
-import edu.illinois.osl.akka.gc.{ActorContext, ActorRef, Behaviors}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.{ActorContext, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 

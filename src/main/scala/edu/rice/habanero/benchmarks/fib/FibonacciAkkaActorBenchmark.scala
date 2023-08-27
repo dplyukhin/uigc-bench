@@ -66,10 +66,10 @@ object FibonacciAkkaActorBenchmark {
 
           } else {
 
-            val f1 = context.actorOf(Props(new FibonacciActor(self, null)))
+            val f1 = context.system.actorOf(Props(new FibonacciActor(self, null)))
             f1 ! Request(req.n - 1)
 
-            val f2 = context.actorOf(Props(new FibonacciActor(self, null)))
+            val f2 = context.system.actorOf(Props(new FibonacciActor(self, null)))
             f2 ! Request(req.n - 2)
 
           }

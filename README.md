@@ -1,3 +1,11 @@
+> This is a fork of [Savina](https://github.com/shamsimam/savina)
+> used to evaluate the [UIGC](https://github.com/dplyukhin/uigc)
+> framework. The following changes have been made:
+> - Build system was ported from Maven to SBT, due to code rot.
+> - Non-Akka benchmarks have been removed.
+> 
+> Several of the Savina benchmarks are not yet implemented for UIGC.
+
 Savina
 ======
 

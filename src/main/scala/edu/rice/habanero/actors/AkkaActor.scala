@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.{Actor, ActorRef, ActorSystem}
 import akka.actor.typed
 import com.typesafe.config.{Config, ConfigFactory}
-import edu.illinois.osl.akka.gc.{AbstractBehavior, ActorContext, Behavior, Behaviors}
+import edu.illinois.osl.uigc.{AbstractBehavior, ActorContext, Behavior, Behaviors}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
