@@ -4,7 +4,7 @@ import akka.actor.typed.{PostStop, Signal, scaladsl}
 import com.typesafe.config.ConfigFactory
 import common.ClusterBenchmark.OrchestratorDone
 import common.{CborSerializable, ClusterBenchmark}
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc._
 
 import scala.collection.mutable
@@ -59,17 +59,17 @@ object RandomWorkers {
   }
 
   private case class LearnPeers(peers: mutable.ArrayBuffer[ActorRef[Protocol]]) extends Protocol {
-    override def refs: Iterable[RefobLike[Nothing]] = peers
+    override def refs: Iterable[Refob[Nothing]] = peers
   }
 
   private case class Work(work: List[Int]) extends Protocol with NoRefs
 
   private case class Acquaint(workers: Seq[ActorRef[Protocol]]) extends Protocol {
-    override def refs: Iterable[RefobLike[Nothing]] = workers
+    override def refs: Iterable[Refob[Nothing]] = workers
   }
 
   private case class Query(n: Int, master: ActorRef[Protocol]) extends Protocol {
-    override def refs: Iterable[RefobLike[Nothing]] = Some(master)
+    override def refs: Iterable[Refob[Nothing]] = Some(master)
   }
 
   private case class QueryResponse(n: Int) extends Protocol with NoRefs
