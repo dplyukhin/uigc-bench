@@ -1,7 +1,7 @@
 package edu.rice.habanero.benchmarks.nqueenk
 
 import akka.actor.typed.ActorSystem
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc.{ActorContext, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -51,7 +51,7 @@ object NQueensAkkaGCActorBenchmark {
 
   trait Msg extends Message
   case class MasterMsg(master: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[RefobLike[Nothing]] = Some(master)
+    override def refs: Iterable[Refob[Nothing]] = Some(master)
   }
   case class WorkMessage(_priority: Int, data: Array[Int], depth: Int) extends Msg with NoRefs {
     val priority = Math.min(NQueensConfig.PRIORITIES - 1, Math.max(0, _priority))

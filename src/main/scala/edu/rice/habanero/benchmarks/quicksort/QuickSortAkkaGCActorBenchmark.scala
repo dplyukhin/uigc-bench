@@ -1,7 +1,7 @@
 package edu.rice.habanero.benchmarks.quicksort
 
 import akka.actor.typed.ActorSystem
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc.{ActorContext, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -57,7 +57,7 @@ object QuickSortAkkaGCActorBenchmark {
   private abstract class Msg extends Message
 
   private case class SortMessage(data: java.util.List[java.lang.Long], parent: Option[ActorRef[Msg]]) extends Msg {
-    override def refs: Iterable[RefobLike[Nothing]] = parent
+    override def refs: Iterable[Refob[Nothing]] = parent
   }
 
   private case class ResultMessage(data: java.util.List[java.lang.Long], position: Position) extends Msg with NoRefs

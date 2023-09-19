@@ -1,7 +1,7 @@
 package edu.rice.habanero.benchmarks.radixsort
 
 import akka.actor.typed.ActorSystem
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc.{ActorContext, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
@@ -42,11 +42,11 @@ object RadixSortAkkaGCActorBenchmark {
 
   trait Msg extends Message
   private case class LocalNextActor(actor: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[RefobLike[Nothing]] = Some(actor)
+    override def refs: Iterable[Refob[Nothing]] = Some(actor)
   }
 
   private case class NextActorMessage(actor: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[RefobLike[Nothing]] = Some(actor)
+    override def refs: Iterable[Refob[Nothing]] = Some(actor)
   }
 
   private case class ValueMessage(value: Long) extends Msg with NoRefs

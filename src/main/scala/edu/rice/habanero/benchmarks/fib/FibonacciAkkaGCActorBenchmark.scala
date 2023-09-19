@@ -2,7 +2,7 @@ package edu.rice.habanero.benchmarks.fib
 
 import akka.actor.typed.{ActorSystem, Signal}
 import edu.illinois.osl.uigc
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc.unmanaged.Behavior
 import edu.illinois.osl.uigc.{ActorContext, ActorFactory, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
@@ -48,7 +48,7 @@ object FibonacciAkkaGCActorBenchmark {
 
   trait Msg extends Message
   private case class Request(n: Int, parent: Option[ActorRef[Msg]]) extends Msg {
-    override def refs: Iterable[RefobLike[Nothing]] = parent
+    override def refs: Iterable[Refob[Nothing]] = parent
   }
   private case class Response(value: Int) extends Msg with NoRefs
 

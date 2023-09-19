@@ -1,7 +1,7 @@
 package edu.rice.habanero.benchmarks.apsp
 
 import akka.actor.typed.ActorSystem
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc.{ActorContext, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -57,7 +57,7 @@ object ApspAkkaGCActorBenchmark {
   private case class ApspResultMessage(k: Int, myBlockId: Int, initData: Array[Array[Long]]) extends ApspMessage with NoRefs
 
   private case class ApspNeighborMessage(neighbors: ListBuffer[ActorRef[ApspMessage]]) extends ApspMessage {
-    override def refs: Iterable[RefobLike[Nothing]] = neighbors
+    override def refs: Iterable[Refob[Nothing]] = neighbors
   }
 
   private class Master(latch: CountDownLatch, context: ActorContext[ApspMessage]) extends GCActor[ApspMessage](context) {

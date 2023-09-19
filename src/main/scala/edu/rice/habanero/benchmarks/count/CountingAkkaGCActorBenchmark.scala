@@ -1,7 +1,7 @@
 package edu.rice.habanero.benchmarks.count
 
 import akka.actor.typed.ActorSystem
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc.{ActorContext, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -58,13 +58,13 @@ object CountingAkkaGCActorBenchmark {
   trait Msg extends Message
 
   private case class Init(counter: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[RefobLike[Nothing]] = Some(counter)
+    override def refs: Iterable[Refob[Nothing]] = Some(counter)
   }
 
   private case class IncrementMessage() extends Msg with NoRefs
 
   private case class RetrieveMessage(sender: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[RefobLike[Nothing]] = Some(sender)
+    override def refs: Iterable[Refob[Nothing]] = Some(sender)
   }
 
   private case class ResultMessage(result: Int) extends Msg with NoRefs

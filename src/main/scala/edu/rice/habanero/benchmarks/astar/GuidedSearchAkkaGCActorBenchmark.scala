@@ -1,7 +1,7 @@
 package edu.rice.habanero.benchmarks.astar
 
 import akka.actor.typed.ActorSystem
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, RefobLike}
+import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc.{ActorContext, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
@@ -51,7 +51,7 @@ object GuidedSearchAkkaGCActorBenchmark {
 
   trait Msg extends Message
   case class GetMaster(master: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[RefobLike[Nothing]] = Some(master)
+    override def refs: Iterable[Refob[Nothing]] = Some(master)
   }
   case class WorkMessage(node: GuidedSearchConfig.GridNode, target: GuidedSearchConfig.GridNode) extends Msg with NoRefs {
     val priority: Int = GuidedSearchConfig.priority(node)
