@@ -24,15 +24,15 @@ For example, the `RandomWorkers` benchmark has three roles;
 To run the benchmark locally, run the following in three different terminals:
 ```bash
 # orchstrator
-sbt "runMain randomworkers.RandomWorkers orchestrator 0.0.0.0 0.0.0.0"
+sbt -Duigc.crgc.num-nodes=3 "runMain randomworkers.RandomWorkers orchestrator 0.0.0.0 0.0.0.0"
 ```
 ```bash
 # manager1
-sbt "runMain randomworkers.RandomWorkers manager1 0.0.0.0 0.0.0.0"
+sbt -Duigc.crgc.num-nodes=3 "runMain randomworkers.RandomWorkers manager1 0.0.0.0 0.0.0.0"
 ```
 ```bash
 # manager2
-sbt "runMain randomworkers.RandomWorkers manager2 0.0.0.0 0.0.0.0"
+sbt -Duigc.crgc.num-nodes=3 "runMain randomworkers.RandomWorkers manager2 0.0.0.0 0.0.0.0"
 ```
 
 The duration of each iteration (excluding warmups) will be logged to
