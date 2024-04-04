@@ -3,8 +3,8 @@ import os
 import time
 
 
-def run_benchmarks():
-    filename = "random-workers"
+def run_benchmark(reqs_per_second, delta_graph_size):
+    filename = f"workers-rps-{reqs_per_second}-dgs-{delta_graph_size}"
 
     # Add JFR options to SBT opts, saving the old value to be restored later.
     original_sbt_opts = os.environ.get("SBT_OPTS", "")
@@ -18,7 +18,10 @@ def run_benchmarks():
 
             print(f"Starting {role}")
             process = subprocess.Popen(
-                ["sbt", "-Duigc.crgc.num-nodes=3", f"runMain randomworkers.RandomWorkers {role} 0.0.0.0 0.0.0.0"],
+                ["sbt", "-Duigc.crgc.num-nodes=3",
+                 f"-Duigc.crgc.delta-graph-size={delta_graph_size}",
+                 f"-Drandom-workers.reqs-per-second={reqs_per_second}",
+                 f"runMain randomworkers.RandomWorkers {role} 0.0.0.0 0.0.0.0"],
                 stdout=log
             )
             processes.append(process)
@@ -30,6 +33,12 @@ def run_benchmarks():
 
     # Restore the original SBT_OPTS for the next iteration
     os.environ["SBT_OPTS"] = original_sbt_opts
+
+
+def run_benchmarks():
+    for reqs_per_second in [100, 200, 300, 400, 500]:
+        for delta_graph_size in [64, 128, 256, 512, 1024]:
+            run_benchmark(reqs_per_second, delta_graph_size)
 
 
 if __name__ == '__main__':

@@ -6,6 +6,8 @@ import common.ClusterBenchmark.OrchestratorDone
 import common.{CborSerializable, ClusterBenchmark}
 import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
 import edu.illinois.osl.uigc._
+import randomworkers.jfr.AppMsgSerialization
+import scala.jdk.CollectionConverters._
 
 import scala.collection.mutable
 import scala.concurrent.duration.DurationInt
@@ -101,11 +103,36 @@ object RandomWorkers {
     val workerProbDeactivateAll = config.getDouble("random-workers.wrk-probabilities.deactivate-all")
   }
 
-  def remove(ref: ActorRef[Protocol], buf: mutable.ArrayBuffer[ActorRef[Protocol]]): Unit = {
+  private def remove(ref: ActorRef[Protocol], buf: mutable.ArrayBuffer[ActorRef[Protocol]]): Unit = {
     val i = buf.indexOf(ref)
     if (i != -1)
       buf.remove(i)
   }
+
+  private def isRemote[T](actor: ActorRef[Nothing])(implicit context: ActorContext[T]): Boolean = {
+    actor.typedActorRef.path.address != context.system.address
+  }
+
+  def sendWorkMsg(recipient : ActorRef[Protocol], work : List[Int])(implicit context: ActorContext[Protocol]) : Unit = {
+    recipient ! Work(work)
+    if (isRemote(recipient)) {
+      val metrics = new AppMsgSerialization()
+      metrics.size += recipient.toString.length
+      metrics.size = work.size * 4
+      metrics.commit()
+    }
+  }
+
+  def sendAcquaintMsg(recipient : ActorRef[Protocol], workers : Seq[ActorRef[Protocol]])(implicit context: ActorContext[Protocol]) : Unit = {
+    recipient ! Acquaint(workers)
+    if (isRemote(recipient)) {
+      val metrics = new AppMsgSerialization()
+      metrics.size += recipient.toString.length
+      metrics.size += workers.map(_.toString.length).sum
+      metrics.commit()
+    }
+  }
+
 
   object Worker {
     def apply(config: Config): ActorFactory[Protocol] =
@@ -136,14 +163,16 @@ object RandomWorkers {
           }
           if (rng.roll(config.workerProbSend) && acquaintances.nonEmpty) {
             val work = state
-            for (i <- 1 to rng.randNat(config.maxSendsInOneTurn))
-              rng.select(acquaintances) ! Work(work)
+            for (i <- 1 to rng.randNat(config.maxSendsInOneTurn)) {
+              val recipient = rng.select(acquaintances)
+              sendWorkMsg(recipient, work)
+            }
           }
           if (rng.roll(config.workerProbAcquaint) && acquaintances.nonEmpty) {
             val acqs = rng.select(acquaintances, config.maxAcqsInOneMsg).toSeq
             val owner = rng.select(acquaintances)
             val refs = acqs.map(acq => ctx.createRef(acq, owner))
-            owner ! Acquaint(refs)
+            sendAcquaintMsg(owner, refs)
           }
           if (rng.roll(config.workerProbDeactivate)) {
             val locals = rng.selectDistinct(acquaintances, config.maxDeactivatedInOneTurn).toSeq
@@ -269,31 +298,35 @@ object RandomWorkers {
         }
         if (rng.roll(config.managerProbLocalSend) && localWorkers.nonEmpty) {
           val work = rng.genData(config.maxWorkSizeBytes / 4)
-          for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn))
-            rng.select(localWorkers) ! Work(work)
+          for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn)) {
+            val recipient = rng.select(localWorkers)
+            sendWorkMsg(recipient, work)
+          }
         }
         if (rng.roll(config.managerProbRemoteSend) && remoteWorkers.nonEmpty) {
           val work = rng.genData(config.maxWorkSizeBytes / 4)
-          for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn))
-            rng.select(remoteWorkers) ! Work(work)
+          for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn)) {
+            val recipient = rng.select(remoteWorkers)
+            sendWorkMsg(recipient, work)
+          }
         }
         if (rng.roll(config.managerProbLocalAcquaint) && localWorkers.nonEmpty) {
           val acqs = rng.select(localWorkers, config.maxAcqsInOneMsg).toSeq
           val owner = rng.select(localWorkers)
           val refs = acqs.map(acq => ctx.createRef(acq, owner))
-          owner ! Acquaint(refs)
+          sendAcquaintMsg(owner, refs)
         }
         if (rng.roll(config.managerProbRemoteAcquaint) && localWorkers.nonEmpty) {
           val acqs = rng.select(remoteWorkers, config.maxAcqsInOneMsg).toSeq
           val owner = rng.select(localWorkers)
           val refs = acqs.map(acq => ctx.createRef(acq, owner))
-          owner ! Acquaint(refs)
+          sendAcquaintMsg(owner, refs)
         }
         if (rng.roll(config.managerProbPublishWorker) && peers.nonEmpty) {
           val acqs = rng.select(localWorkers, config.maxAcqsInOneMsg).toSeq
           val peer = rng.select(peers)
           val refs = acqs.map(acq => ctx.createRef(acq, peer))
-          peer ! Acquaint(refs)
+          sendAcquaintMsg(peer, refs)
         }
         if (rng.roll(config.managerProbQuery) && isLeader && localWorkers.nonEmpty && queryID < config.totalQueries) {
           val worker = rng.select(localWorkers)
