@@ -1,8 +1,8 @@
 package edu.rice.habanero.benchmarks.count
 
 import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
-import org.apache.pekko.uigc.{ActorContext, ActorRef, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -50,7 +50,7 @@ object CountingAkkaGCActorBenchmark {
 
     producer ! Init(context.createRef(counter, producer))
     producer ! IncrementMessage()
-    context.release(counter, producer)
+    //context.release(counter, producer)
 
     override def process(msg: Message): Unit = ()
   }
@@ -58,13 +58,13 @@ object CountingAkkaGCActorBenchmark {
   trait Msg extends Message
 
   private case class Init(counter: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[Refob[Nothing]] = Some(counter)
+    override def refs: Iterable[ActorRef[_]] = Some(counter)
   }
 
   private case class IncrementMessage() extends Msg with NoRefs
 
   private case class RetrieveMessage(sender: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[Refob[Nothing]] = Some(sender)
+    override def refs: Iterable[ActorRef[_]] = Some(sender)
   }
 
   private case class ResultMessage(result: Int) extends Msg with NoRefs
@@ -87,7 +87,7 @@ object CountingAkkaGCActorBenchmark {
           }
 
           counter ! RetrieveMessage(context.createRef(context.self, counter))
-          context.release(counter)
+          //context.release(counter)
 
         case m: ResultMessage =>
           val result = m.result
@@ -112,7 +112,7 @@ object CountingAkkaGCActorBenchmark {
           count += 1
         case m: RetrieveMessage =>
           m.sender ! ResultMessage(count)
-          context.release(m.sender)
+          //context.release(m.sender)
           exit()
       }
     }

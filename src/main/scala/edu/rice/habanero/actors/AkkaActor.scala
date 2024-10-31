@@ -4,7 +4,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem}
 import org.apache.pekko.actor.typed
 import com.typesafe.config.{Config, ConfigFactory}
-import org.apache.pekko.uigc.{AbstractBehavior, ActorContext, Behavior, Behaviors}
+import org.apache.pekko.uigc.actor.typed.{AbstractBehavior, Behavior, Message}
+import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -44,7 +45,7 @@ abstract class AkkaActor[MsgType] extends Actor {
   }
 }
 
-abstract class GCActor[MsgType](ctx: ActorContext[MsgType]) extends AbstractBehavior[MsgType](ctx) {
+abstract class GCActor[MsgType <: Message](ctx: ActorContext[MsgType]) extends AbstractBehavior[MsgType](ctx) {
   final def onMessage(msg: MsgType): Behavior[MsgType] = {
     process(msg)
     this

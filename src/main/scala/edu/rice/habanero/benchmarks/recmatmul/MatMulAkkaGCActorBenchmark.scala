@@ -1,8 +1,8 @@
 package edu.rice.habanero.benchmarks.recmatmul
 
 import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
-import org.apache.pekko.uigc.{ActorContext, ActorRef, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
 
@@ -46,7 +46,7 @@ object MatMulAkkaGCActorBenchmark {
 
   trait Msg extends Message
   case class MasterMsg(master: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[Refob[Nothing]] = Some(master)
+    override def refs: Iterable[ActorRef[_]] = Some(master)
   }
   case object DoneMessage extends Msg with NoRefs
   case object StopMessage extends Msg with NoRefs

@@ -1,8 +1,8 @@
 package edu.rice.habanero.benchmarks.quicksort
 
 import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
-import org.apache.pekko.uigc.{ActorContext, ActorRef, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -57,7 +57,7 @@ object QuickSortAkkaGCActorBenchmark {
   private abstract class Msg extends Message
 
   private case class SortMessage(data: java.util.List[java.lang.Long], parent: Option[ActorRef[Msg]]) extends Msg {
-    override def refs: Iterable[Refob[Nothing]] = parent
+    override def refs: Iterable[ActorRef[_]] = parent
   }
 
   private case class ResultMessage(data: java.util.List[java.lang.Long], position: Position) extends Msg with NoRefs
@@ -75,7 +75,7 @@ object QuickSortAkkaGCActorBenchmark {
       }
       if (parent.isDefined) {
         parent.get ! ResultMessage(result, positionRelativeToParent)
-        context.release(parent)
+        //context.release(parent)
       }
       else {
         latch.countDown()
@@ -102,12 +102,12 @@ object QuickSortAkkaGCActorBenchmark {
             val leftUnsorted = QuickSortConfig.filterLessThan(data, pivot)
             val leftActor = context.spawnAnonymous(Behaviors.setup[Msg](ctx => new QuickSortActor(PositionLeft, null, ctx)))
             leftActor ! SortMessage(leftUnsorted, Some(context.createRef(context.self, leftActor)))
-            context.release(leftActor)
+            //context.release(leftActor)
 
             val rightUnsorted = QuickSortConfig.filterGreaterThan(data, pivot)
             val rightActor = context.spawnAnonymous(Behaviors.setup[Msg](ctx => new QuickSortActor(PositionRight, null, ctx)))
             rightActor ! SortMessage(rightUnsorted, Some(context.createRef(context.self, rightActor)))
-            context.release(rightActor)
+            //context.release(rightActor)
 
             result = QuickSortConfig.filterEqualsTo(data, pivot)
             numFragments += 1

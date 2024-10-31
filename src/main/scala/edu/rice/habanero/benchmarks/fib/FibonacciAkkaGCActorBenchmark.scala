@@ -1,10 +1,8 @@
 package edu.rice.habanero.benchmarks.fib
 
 import org.apache.pekko.actor.typed.{ActorSystem, Signal}
-import org.apache.pekko.uigc
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
-import org.apache.pekko.uigc.unmanaged.Behavior
-import org.apache.pekko.uigc.{ActorContext, ActorFactory, ActorRef, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -34,7 +32,7 @@ object FibonacciAkkaGCActorBenchmark {
     def runIteration() {
 
       val latch = new CountDownLatch(1)
-      system = AkkaActorState.newTypedActorSystem(FibonacciActor.root(latch), "Fibonacci")
+      system = AkkaActorState.newTypedActorSystem(Behaviors.setupRoot(ctx => new FibonacciActor(latch, ctx)), "Fibonacci")
 
       system ! Request(FibonacciConfig.N, None)
 
@@ -48,21 +46,11 @@ object FibonacciAkkaGCActorBenchmark {
 
   trait Msg extends Message
   private case class Request(n: Int, parent: Option[ActorRef[Msg]]) extends Msg {
-    override def refs: Iterable[Refob[Nothing]] = parent
+    override def refs: Iterable[ActorRef[_]] = parent
   }
   private case class Response(value: Int) extends Msg with NoRefs
 
   private val RESPONSE_ONE = Response(1)
-
-  object FibonacciActor {
-    def root(latch: CountDownLatch): Behavior[Msg] =
-      Behaviors.setupRoot[Msg](ctx =>
-        new FibonacciActor(latch, ctx))
-
-    def apply(latch: CountDownLatch): ActorFactory[Msg] =
-      Behaviors.setup[Msg](ctx =>
-        new FibonacciActor(latch, ctx))
-  }
 
   private class FibonacciActor(latch: CountDownLatch, context: ActorContext[Msg]) extends GCActor[Msg](context) {
 
@@ -89,7 +77,7 @@ object FibonacciAkkaGCActorBenchmark {
             val f2 = context.spawnAnonymous(Behaviors.setup[Msg](ctx => new FibonacciActor(null, ctx)))
             f2 ! Request(req.n - 2, Some(context.createRef(context.self, f2)))
 
-            context.release(f1, f2)
+            //context.release(f1, f2)
 
           }
 
@@ -107,7 +95,7 @@ object FibonacciAkkaGCActorBenchmark {
     private def processResult(response: Response) {
       if (parent.isDefined) {
         parent.get ! response
-        context.release(parent.get)
+        //context.release(parent.get)
       } else {
         latch.countDown()
         println(" Result = " + result)

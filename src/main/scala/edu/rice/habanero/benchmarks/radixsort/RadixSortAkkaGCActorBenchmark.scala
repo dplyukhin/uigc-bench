@@ -1,8 +1,8 @@
 package edu.rice.habanero.benchmarks.radixsort
 
 import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
-import org.apache.pekko.uigc.{ActorContext, ActorRef, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
 
@@ -42,11 +42,11 @@ object RadixSortAkkaGCActorBenchmark {
 
   trait Msg extends Message
   private case class LocalNextActor(actor: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[Refob[Nothing]] = Some(actor)
+    override def refs: Iterable[ActorRef[_]] = Some(actor)
   }
 
   private case class NextActorMessage(actor: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[Refob[Nothing]] = Some(actor)
+    override def refs: Iterable[ActorRef[_]] = Some(actor)
   }
 
   private case class ValueMessage(value: Long) extends Msg with NoRefs
@@ -67,12 +67,12 @@ object RadixSortAkkaGCActorBenchmark {
       sortActor ! LocalNextActor(context.createRef(localNextActor, sortActor))
 
       radix /= 2
-      context.release(nextActor)
+      //context.release(nextActor)
       nextActor = sortActor
     }
 
     sourceActor ! NextActorMessage(context.createRef(nextActor, sourceActor))
-    context.release(sourceActor, nextActor)
+    //context.release(sourceActor, nextActor)
 
     override def process(msg: Msg): Unit = ()
   }

@@ -1,8 +1,8 @@
 package edu.rice.habanero.benchmarks.apsp
 
 import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
-import org.apache.pekko.uigc.{ActorContext, ActorRef, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -57,7 +57,7 @@ object ApspAkkaGCActorBenchmark {
   private case class ApspResultMessage(k: Int, myBlockId: Int, initData: Array[Array[Long]]) extends ApspMessage with NoRefs
 
   private case class ApspNeighborMessage(neighbors: ListBuffer[ActorRef[ApspMessage]]) extends ApspMessage {
-    override def refs: Iterable[Refob[Nothing]] = neighbors
+    override def refs: Iterable[ActorRef[_]] = neighbors
   }
 
   private class Master(latch: CountDownLatch, context: ActorContext[ApspMessage]) extends GCActor[ApspMessage](context) {
@@ -105,7 +105,7 @@ object ApspAkkaGCActorBenchmark {
       for (bj <- 0 until numBlocksInSingleDim) {
         blockActors(bi)(bj) ! ApspInitialMessage
       }
-      context.release(blockActors(bi))
+      //context.release(blockActors(bi))
     }
 
     override def process(msg: ApspMessage): Unit = ()

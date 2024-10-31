@@ -1,8 +1,8 @@
 package edu.rice.habanero.benchmarks.nqueenk
 
 import org.apache.pekko.actor.typed.ActorSystem
-import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
-import org.apache.pekko.uigc.{ActorContext, ActorRef, Behaviors}
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
@@ -51,7 +51,7 @@ object NQueensAkkaGCActorBenchmark {
 
   trait Msg extends Message
   case class MasterMsg(master: ActorRef[Msg]) extends Msg {
-    override def refs: Iterable[Refob[Nothing]] = Some(master)
+    override def refs: Iterable[ActorRef[_]] = Some(master)
   }
   case class WorkMessage(_priority: Int, data: Array[Int], depth: Int) extends Msg with NoRefs {
     val priority = Math.min(NQueensConfig.PRIORITIES - 1, Math.max(0, _priority))
@@ -134,7 +134,7 @@ object NQueensAkkaGCActorBenchmark {
           master ! DoneMessage
         case StopMessage =>
           master ! theMsg
-          context.release(master)
+          //context.release(master)
           exit()
         case _ =>
       }
