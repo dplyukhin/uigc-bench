@@ -1,10 +1,10 @@
 package edu.rice.habanero.benchmarks.fib
 
-import akka.actor.typed.{ActorSystem, Signal}
-import edu.illinois.osl.uigc
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
-import edu.illinois.osl.uigc.unmanaged.Behavior
-import edu.illinois.osl.uigc.{ActorContext, ActorFactory, ActorRef, Behaviors}
+import org.apache.pekko.actor.typed.{ActorSystem, Signal}
+import org.apache.pekko.uigc
+import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
+import org.apache.pekko.uigc.unmanaged.Behavior
+import org.apache.pekko.uigc.{ActorContext, ActorFactory, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 

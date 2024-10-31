@@ -1,6 +1,6 @@
 package edu.rice.habanero.benchmarks.threadring
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.threadring.ThreadRingConfig.{DataMessage, ExitMessage, PingMessage}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}

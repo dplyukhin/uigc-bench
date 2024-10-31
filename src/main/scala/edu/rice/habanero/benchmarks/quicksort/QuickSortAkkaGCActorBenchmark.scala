@@ -1,8 +1,8 @@
 package edu.rice.habanero.benchmarks.quicksort
 
-import akka.actor.typed.ActorSystem
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
-import edu.illinois.osl.uigc.{ActorContext, ActorRef, Behaviors}
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.uigc.interfaces.{Message, NoRefs, Refob}
+import org.apache.pekko.uigc.{ActorContext, ActorRef, Behaviors}
 import edu.rice.habanero.actors.{AkkaActor, AkkaActorState, GCActor}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
