@@ -33,31 +33,4 @@ public final class BigConfig {
         System.out.printf(BenchmarkRunner.argOutputFormat, "W (num actors)", W);
         System.out.printf(BenchmarkRunner.argOutputFormat, "debug", debug);
     }
-
-    protected static interface Message {
-    }
-
-    protected static final class PingMessage implements Message {
-        public final int sender;
-
-        protected PingMessage(final int sender) {
-            this.sender = sender;
-        }
-    }
-
-    protected static final class PongMessage implements Message {
-        public final int sender;
-
-        protected PongMessage(final int sender) {
-            this.sender = sender;
-        }
-    }
-
-    protected static final class ExitMessage implements Message {
-        public static final ExitMessage ONLY = new ExitMessage();
-
-        protected ExitMessage() {
-            super();
-        }
-    }
 }

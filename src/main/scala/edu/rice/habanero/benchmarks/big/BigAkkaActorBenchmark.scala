@@ -1,8 +1,9 @@
 package edu.rice.habanero.benchmarks.big
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
-import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
-import edu.rice.habanero.benchmarks.big.BigConfig.{ExitMessage, Message, PingMessage, PongMessage}
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
+import edu.rice.habanero.actors.{GCActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner, PseudoRandom}
 
 import java.util.concurrent.CountDownLatch
@@ -25,28 +26,11 @@ object BigAkkaActorBenchmark {
       BigConfig.printArgs()
     }
 
-    private var system: ActorSystem = _
+    private var system: ActorSystem[Msg] = _
     def runIteration() {
 
-      system = AkkaActorState.newActorSystem("Big")
-
-      val sinkActor = system.actorOf(Props(new SinkActor(BigConfig.W)))
-
       val latch = new CountDownLatch(BigConfig.W)
-      val bigActors = Array.tabulate[ActorRef](BigConfig.W)(i => {
-        val loopActor = system.actorOf(Props(new BigActor(i, BigConfig.N, sinkActor, latch)))
-        loopActor
-      })
-
-      val neighborMessage = new NeighborMessage(bigActors)
-      sinkActor ! neighborMessage
-      bigActors.foreach(loopActor => {
-        loopActor ! neighborMessage
-      })
-
-      bigActors.foreach(loopActor => {
-        loopActor ! new PongMessage(-1)
-      })
+      system = AkkaActorState.newTypedActorSystem(Behaviors.setupRoot[Msg](ctx => new Master(latch, ctx)), "Big")
 
       latch.await()
     }
@@ -56,19 +40,52 @@ object BigAkkaActorBenchmark {
     }
   }
 
-  private case class NeighborMessage(neighbors: Array[ActorRef]) extends Message
+  trait Msg extends Message
+  case class NeighborMessage(neighbors: Array[ActorRef[Msg]]) extends Msg {
+    def refs: Iterable[ActorRef[_]] = neighbors
+  }
+  final class PingMessage(val sender: Int) extends Msg with NoRefs
+  final class PongMessage(val sender: Int) extends Msg with NoRefs
+  final object ExitMessage extends Msg with NoRefs
 
-  private class BigActor(id: Int, numMessages: Int, sinkActor: ActorRef, latch: CountDownLatch) extends AkkaActor[AnyRef] {
+  private class Master(latch: CountDownLatch, ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
+    {
+      val sinkActor = ctx.spawnAnonymous(Behaviors.setup[Msg](ctx => new SinkActor(BigConfig.W, ctx)))
+
+      val bigActors = Array.tabulate[ActorRef[Msg]](BigConfig.W)(i => {
+        val loopActor = ctx.spawnAnonymous(Behaviors.setup[Msg](ctx => new BigActor(i, BigConfig.N, sinkActor, latch, ctx)))
+        loopActor
+      })
+
+      sinkActor ! NeighborMessage(
+        bigActors.map(target => ctx.createRef(target, sinkActor))
+      )
+      bigActors.foreach(loopActor => {
+        loopActor ! NeighborMessage(
+          bigActors.map(target => ctx.createRef(target, loopActor))
+        )
+      })
+
+      bigActors.foreach(loopActor => {
+        loopActor ! new PongMessage(-1)
+      })
+    }
+
+    def process(msg: Msg): Unit = ()
+  }
+
+  private class BigActor(id: Int, numMessages: Int, sinkActor: ActorRef[Msg], latch: CountDownLatch, ctx: ActorContext[Msg])
+    extends GCActor[Msg](ctx) {
 
     private var numPings = 0
     private var expPinger = -1
     private val random = new PseudoRandom(id)
-    private var neighbors: Array[ActorRef] = null
+    private var neighbors: Array[ActorRef[Msg]] = null
 
     private val myPingMessage = new PingMessage(id)
     private val myPongMessage = new PongMessage(id)
 
-    override def process(msg: AnyRef) {
+    override def process(msg: Msg) {
       msg match {
         case pm: PingMessage =>
 
@@ -102,12 +119,12 @@ object BigAkkaActorBenchmark {
     }
   }
 
-  private class SinkActor(numWorkers: Int) extends AkkaActor[AnyRef] {
+  private class SinkActor(numWorkers: Int, ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
 
     private var numMessages = 0
-    private var neighbors: Array[ActorRef] = null
+    private var neighbors: Array[ActorRef[Msg]] = null
 
-    override def process(msg: AnyRef) {
+    override def process(msg: Msg) {
       msg match {
         case nm: NeighborMessage =>
 
