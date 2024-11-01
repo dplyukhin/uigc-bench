@@ -1,7 +1,9 @@
 package edu.rice.habanero.benchmarks.fjthrput
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
-import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
+import edu.rice.habanero.actors.{GCActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
 import java.util.concurrent.CountDownLatch
@@ -25,28 +27,14 @@ object ThroughputAkkaActorBenchmark {
       ThroughputConfig.printArgs()
     }
 
-    private var system: ActorSystem = _
+    private var system: ActorSystem[Msg.type] = _
     def runIteration() {
 
-      system = AkkaActorState.newActorSystem("Throughput")
       val latch = new CountDownLatch(ThroughputConfig.A)
-
-      val actors = Array.tabulate[ActorRef](ThroughputConfig.A)(i => {
-        val loopActor = system.actorOf(Props(new ThroughputActor(ThroughputConfig.N, latch)))
-        loopActor
-      })
-
-      val message = new Object()
-
-      var m = 0
-      while (m < ThroughputConfig.N) {
-
-        actors.foreach(loopActor => {
-          loopActor ! message
-        })
-
-        m += 1
-      }
+      system = AkkaActorState.newTypedActorSystem(
+        Behaviors.setupRoot[Msg.type](ctx =>
+          new Master(latch, ctx)),
+        "Throughput")
 
       latch.await()
     }
@@ -56,11 +44,37 @@ object ThroughputAkkaActorBenchmark {
     }
   }
 
-  private class ThroughputActor(totalMessages: Int, latch: CountDownLatch) extends AkkaActor[AnyRef] {
+  case object Msg extends Message with NoRefs
+
+  private class Master(latch: CountDownLatch, ctx: ActorContext[Msg.type]) extends GCActor[Msg.type](ctx) {
+    {
+      val actors = Array.tabulate[ActorRef[Msg.type]](ThroughputConfig.A)(i => {
+        val loopActor = ctx.spawnAnonymous(
+          Behaviors.setup[Msg.type](ctx => new ThroughputActor(ThroughputConfig.N, latch, ctx)))
+        loopActor
+      })
+
+
+      var m = 0
+      while (m < ThroughputConfig.N) {
+
+        actors.foreach(loopActor => {
+          loopActor ! Msg
+        })
+
+        m += 1
+      }
+    }
+
+    def process(msg: Msg.type) = ()
+  }
+
+  private class ThroughputActor(totalMessages: Int, latch: CountDownLatch, ctx: ActorContext[Msg.type])
+    extends GCActor[Msg.type](ctx) {
 
     private var messagesProcessed = 0
 
-    override def process(msg: AnyRef) {
+    override def process(msg: Msg.type) {
 
       messagesProcessed += 1
       ThroughputConfig.performComputation(37.2)

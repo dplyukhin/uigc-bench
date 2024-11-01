@@ -1,8 +1,9 @@
 package edu.rice.habanero.benchmarks.pingpong
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
-import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
-import edu.rice.habanero.benchmarks.pingpong.PingPongConfig.{Message, PingMessage, StartMessage, StopMessage}
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
+import edu.rice.habanero.actors.{GCActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
 import java.util.concurrent.CountDownLatch
@@ -26,16 +27,14 @@ object PingPongAkkaActorBenchmark {
       PingPongConfig.printArgs()
     }
 
-    private var system: ActorSystem = _
+    private var system: ActorSystem[Msg] = _
     def runIteration() {
 
-      system = AkkaActorState.newActorSystem("PingPong")
       val latch = new CountDownLatch(1)
-
-      val pong = system.actorOf(Props(new PongActor()))
-      val ping = system.actorOf(Props(new PingActor(PingPongConfig.N, pong, latch)))
-
-      ping ! StartMessage.ONLY
+      system = AkkaActorState.newTypedActorSystem(
+        Behaviors.setupRoot[Msg](ctx =>
+          new Master(latch, ctx)),
+        "PingPong")
 
       latch.await()
     }
@@ -45,24 +44,46 @@ object PingPongAkkaActorBenchmark {
     }
   }
 
-  private class PingActor(count: Int, pong: ActorRef, latch: CountDownLatch) extends AkkaActor[Message] {
+  trait Msg extends Message
+  case class StartMessage(pong: ActorRef[Msg]) extends Msg with NoRefs
+  case object StopMessage extends Msg with NoRefs
+  case object PingMessage extends Msg with NoRefs
+  case object SendPongMessage extends Msg with NoRefs
+  case class SendPingMessage(sender: ActorRef[Msg]) extends Msg {
+    override def refs: Iterable[ActorRef[_]] = Some(sender)
+  }
 
+  private class Master(latch: CountDownLatch, ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
+    {
+      val pong = ctx.spawn(Behaviors.setup[Msg](ctx => new PongActor(ctx)), "Pong")
+      val ping = ctx.spawn(Behaviors.setup[Msg](ctx => new PingActor(PingPongConfig.N, latch, ctx)), "Ping")
+      ping ! StartMessage(pong)
+    }
+
+    def process(msg: Msg) = ()
+  }
+
+  private class PingActor(count: Int, latch: CountDownLatch, ctx: ActorContext[Msg])
+    extends GCActor[Msg](ctx) {
+
+    private var pong: ActorRef[Msg] = _
     private var pingsLeft: Int = count
 
-    override def process(msg: PingPongConfig.Message) {
+    override def process(msg: Msg) {
       msg match {
-        case _: PingPongConfig.StartMessage =>
-          pong ! new PingPongConfig.SendPingMessage(self)
+        case StartMessage(pong) =>
+          this.pong = pong
+          pong ! SendPingMessage(ctx.createRef(ctx.self, pong))
           pingsLeft = pingsLeft - 1
-        case _: PingPongConfig.PingMessage =>
-          pong ! new PingPongConfig.SendPingMessage(self)
+        case PingMessage =>
+          pong ! SendPingMessage(ctx.createRef(ctx.self, pong))
           pingsLeft = pingsLeft - 1
-        case _: PingPongConfig.SendPongMessage =>
+        case SendPongMessage =>
           if (pingsLeft > 0) {
-            self ! PingMessage.ONLY
+            ctx.self ! PingMessage
           } else {
             latch.countDown()
-            pong ! StopMessage.ONLY
+            pong ! StopMessage
             exit()
           }
         case message =>
@@ -72,16 +93,15 @@ object PingPongAkkaActorBenchmark {
     }
   }
 
-  private class PongActor extends AkkaActor[Message] {
+  private class PongActor(ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
     private var pongCount: Int = 0
 
-    override def process(msg: PingPongConfig.Message) {
+    override def process(msg: Msg) {
       msg match {
-        case message: PingPongConfig.SendPingMessage =>
-          val sender = message.sender.asInstanceOf[ActorRef]
-          sender ! new PingPongConfig.SendPongMessage(self)
+        case SendPingMessage(sender) =>
+          sender ! SendPongMessage
           pongCount = pongCount + 1
-        case _: PingPongConfig.StopMessage =>
+        case StopMessage =>
           exit()
         case message =>
           val ex = new IllegalArgumentException("Unsupported message: " + message)

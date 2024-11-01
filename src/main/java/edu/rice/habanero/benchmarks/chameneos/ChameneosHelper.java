@@ -61,45 +61,5 @@ public class ChameneosHelper {
         FADED
     }
 
-    protected static interface Message {
-    }
-
-    protected static class MeetMsg implements Message {
-        public final Color color;
-        public final Object sender;
-
-        protected MeetMsg(final Color color, final Object sender) {
-            this.color = color;
-            this.sender = sender;
-        }
-    }
-
-    protected static class ChangeMsg implements Message {
-        public final Color color;
-        public final Object sender;
-
-        protected ChangeMsg(final Color color, final Object sender) {
-            this.color = color;
-            this.sender = sender;
-        }
-    }
-
-    protected static class MeetingCountMsg implements Message {
-        public final int count;
-        public final Object sender;
-
-        protected MeetingCountMsg(final int count, final Object sender) {
-            this.count = count;
-            this.sender = sender;
-        }
-    }
-
-    protected static class ExitMsg implements Message {
-        public final Object sender;
-
-        protected ExitMsg(final Object sender) {
-            this.sender = sender;
-        }
-    }
 
 }

@@ -33,44 +33,4 @@ public final class ThreadRingConfig {
         System.out.printf(BenchmarkRunner.argOutputFormat, "R (num rounds)", R);
         System.out.printf(BenchmarkRunner.argOutputFormat, "debug", debug);
     }
-
-    protected static final class PingMessage {
-        public final int pingsLeft;
-
-        protected PingMessage(final int pingsLeft) {
-            this.pingsLeft = pingsLeft;
-        }
-
-        protected boolean hasNext() {
-            return pingsLeft > 0;
-        }
-
-        protected PingMessage next() {
-            return new PingMessage(pingsLeft - 1);
-        }
-    }
-
-    protected static final class DataMessage {
-        public final Object data;
-
-        protected DataMessage(final Object data) {
-            this.data = data;
-        }
-    }
-
-    protected static final class ExitMessage {
-        public final int exitsLeft;
-
-        protected ExitMessage(final int exitsLeft) {
-            this.exitsLeft = exitsLeft;
-        }
-
-        protected boolean hasNext() {
-            return exitsLeft > 0;
-        }
-
-        protected ExitMessage next() {
-            return new ExitMessage(exitsLeft - 1);
-        }
-    }
 }

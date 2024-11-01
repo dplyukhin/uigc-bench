@@ -28,44 +28,4 @@ public final class PingPongConfig {
         System.out.printf(BenchmarkRunner.argOutputFormat, "N (num pings)", N);
         System.out.printf(BenchmarkRunner.argOutputFormat, "debug", debug);
     }
-
-    protected static abstract class Message {
-    }
-
-    protected static class StartMessage extends Message {
-        static StartMessage ONLY = new StartMessage();
-
-        protected StartMessage() {
-        }
-    }
-
-    protected static class PingMessage extends Message {
-        static PingMessage ONLY = new PingMessage();
-
-        protected PingMessage() {
-        }
-    }
-
-    protected static class SendPongMessage extends Message {
-        public final Object sender;
-
-        protected SendPongMessage(final Object sender) {
-            this.sender = sender;
-        }
-    }
-
-    protected static class SendPingMessage extends Message {
-        public final Object sender;
-
-        protected SendPingMessage(final Object sender) {
-            this.sender = sender;
-        }
-    }
-
-    protected static class StopMessage extends Message {
-        protected static StopMessage ONLY = new StopMessage();
-
-        private StopMessage() {
-        }
-    }
 }

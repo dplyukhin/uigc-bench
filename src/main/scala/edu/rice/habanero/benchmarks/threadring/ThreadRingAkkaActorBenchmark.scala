@@ -1,8 +1,9 @@
 package edu.rice.habanero.benchmarks.threadring
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem, Props}
-import edu.rice.habanero.actors.{AkkaActor, AkkaActorState}
-import edu.rice.habanero.benchmarks.threadring.ThreadRingConfig.{DataMessage, ExitMessage, PingMessage}
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
+import edu.rice.habanero.actors.{GCActor, AkkaActorState}
 import edu.rice.habanero.benchmarks.{Benchmark, BenchmarkRunner}
 
 import java.util.concurrent.CountDownLatch
@@ -26,24 +27,14 @@ object ThreadRingAkkaActorBenchmark {
       ThreadRingConfig.printArgs()
     }
 
-    private var system: ActorSystem = _
+    private var system: ActorSystem[Msg] = _
     def runIteration() {
 
-      system = AkkaActorState.newActorSystem("ThreadRing")
       val latch = new CountDownLatch(1)
-
-      val numActorsInRing = ThreadRingConfig.N
-      val ringActors = Array.tabulate[ActorRef](numActorsInRing)(i => {
-        val loopActor = system.actorOf(Props(new ThreadRingActor(i, numActorsInRing, latch)))
-        loopActor
-      })
-
-      for ((loopActor, i) <- ringActors.view.zipWithIndex) {
-        val nextActor = ringActors((i + 1) % numActorsInRing)
-        loopActor ! new DataMessage(nextActor)
-      }
-
-      ringActors(0) ! new PingMessage(ThreadRingConfig.R)
+      system = AkkaActorState.newTypedActorSystem(
+        Behaviors.setupRoot[Msg](ctx =>
+          new Master(latch, ctx)),
+        "ThreadRing")
 
       latch.await()
     }
@@ -53,11 +44,45 @@ object ThreadRingAkkaActorBenchmark {
     }
   }
 
-  private class ThreadRingActor(id: Int, numActorsInRing: Int, latch: CountDownLatch) extends AkkaActor[AnyRef] {
+  trait Msg extends Message
+  case class PingMessage (val pingsLeft: Int) extends Msg with NoRefs {
+    def hasNext: Boolean = pingsLeft > 0
+    def next () = PingMessage(pingsLeft - 1)
+  }
+  case class DataMessage (val data: ActorRef[Msg]) extends Msg {
+    override def refs: Iterable[ActorRef[_]] = Some(data)
+  }
+  case class ExitMessage (val exitsLeft: Int) extends Msg with NoRefs {
+    def hasNext: Boolean = exitsLeft > 0
+    def next() = ExitMessage(exitsLeft - 1)
+  }
 
-    private var nextActor: ActorRef = null
+  private class Master(latch: CountDownLatch, ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
+    {
+      val numActorsInRing = ThreadRingConfig.N
+      val ringActors = Array.tabulate[ActorRef[Msg]](numActorsInRing)(i => {
+        val loopActor = ctx.spawnAnonymous(
+          Behaviors.setup[Msg](ctx => new ThreadRingActor(i, numActorsInRing, latch, ctx)))
+        loopActor
+      })
 
-    override def process(msg: AnyRef) {
+      for ((loopActor, i) <- ringActors.view.zipWithIndex) {
+        val nextActor = ringActors((i + 1) % numActorsInRing)
+        loopActor ! DataMessage(ctx.createRef(nextActor, loopActor))
+      }
+
+      ringActors(0) ! PingMessage(ThreadRingConfig.R)
+    }
+
+    def process(msg: Msg) = ()
+  }
+
+  private class ThreadRingActor(id: Int, numActorsInRing: Int, latch: CountDownLatch, ctx: ActorContext[Msg])
+    extends GCActor[Msg](ctx) {
+
+    private var nextActor: ActorRef[Msg] = null
+
+    override def process(msg: Msg) {
 
       msg match {
 
@@ -79,7 +104,7 @@ object ThreadRingAkkaActorBenchmark {
 
         case dm: DataMessage =>
 
-          nextActor = dm.data.asInstanceOf[ActorRef]
+          nextActor = dm.data
       }
     }
   }
