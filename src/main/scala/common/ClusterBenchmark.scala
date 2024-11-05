@@ -1,8 +1,8 @@
 package common
 
-import akka.actor.typed._
-import akka.actor.typed.receptionist.{Receptionist, ServiceKey}
-import akka.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed._
+import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import com.typesafe.config.ConfigFactory
 
 import java.io.{BufferedWriter, FileWriter}

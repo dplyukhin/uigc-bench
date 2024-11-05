@@ -1,13 +1,12 @@
 package randomworkers
 
-import akka.actor.typed.{PostStop, Signal, scaladsl}
+import org.apache.pekko.actor.typed
 import com.typesafe.config.ConfigFactory
 import common.ClusterBenchmark.OrchestratorDone
-import common.{CborSerializable, ClusterBenchmark}
-import edu.illinois.osl.uigc.interfaces.{Message, NoRefs, Refob}
-import edu.illinois.osl.uigc._
+import common.ClusterBenchmark
+import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.uigc.actor.typed.scaladsl._
 import randomworkers.jfr.AppMsgSerialization
-import scala.jdk.CollectionConverters._
 
 import scala.collection.mutable
 import scala.concurrent.duration.DurationInt
@@ -25,7 +24,7 @@ object RandomWorkers {
 
   trait Protocol extends Serializable with Message
 
-  class Random() {
+  private class Random() {
 
     private val rng = new java.util.Random(System.currentTimeMillis())
 
@@ -61,17 +60,17 @@ object RandomWorkers {
   }
 
   private case class LearnPeers(peers: mutable.ArrayBuffer[ActorRef[Protocol]]) extends Protocol {
-    override def refs: Iterable[Refob[Nothing]] = peers
+    override def refs: Iterable[ActorRef[Nothing]] = peers
   }
 
   private case class Work(work: List[Int]) extends Protocol with NoRefs
 
   private case class Acquaint(workers: Seq[ActorRef[Protocol]]) extends Protocol {
-    override def refs: Iterable[Refob[Nothing]] = workers
+    override def refs: Iterable[ActorRef[Nothing]] = workers
   }
 
   private case class Query(n: Int, master: ActorRef[Protocol]) extends Protocol {
-    override def refs: Iterable[Refob[Nothing]] = Some(master)
+    override def refs: Iterable[ActorRef[Nothing]] = Some(master)
   }
 
   private case class QueryResponse(n: Int) extends Protocol with NoRefs
@@ -109,11 +108,11 @@ object RandomWorkers {
       buf.remove(i)
   }
 
-  private def isRemote[T](actor: ActorRef[Nothing])(implicit context: ActorContext[T]): Boolean = {
-    actor.typedActorRef.path.address != context.system.address
+  private def isRemote(actor: ActorRef[Nothing])(implicit context: ActorContext[Protocol]): Boolean = {
+    actor.path.address != context.system.address
   }
 
-  def sendWorkMsg(recipient : ActorRef[Protocol], work : List[Int])(implicit context: ActorContext[Protocol]) : Unit = {
+  private def sendWorkMsg(recipient : ActorRef[Protocol], work : List[Int])(implicit context: ActorContext[Protocol]) : Unit = {
     recipient ! Work(work)
     if (isRemote(recipient)) {
       val metrics = new AppMsgSerialization()
@@ -123,7 +122,7 @@ object RandomWorkers {
     }
   }
 
-  def sendAcquaintMsg(recipient : ActorRef[Protocol], workers : Seq[ActorRef[Protocol]])(implicit context: ActorContext[Protocol]) : Unit = {
+  private def sendAcquaintMsg(recipient : ActorRef[Protocol], workers : Seq[ActorRef[Protocol]])(implicit context: ActorContext[Protocol]) : Unit = {
     recipient ! Acquaint(workers)
     if (isRemote(recipient)) {
       val metrics = new AppMsgSerialization()
@@ -158,12 +157,12 @@ object RandomWorkers {
         case Work(work) =>
           state = state.zip(work).map{case (a,b) => a + b}
           if (rng.roll(config.workerProbSpawn)) {
-            for (i <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
+            for (_ <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
               acquaintances.append(ctx.spawnAnonymous(Worker(config)))
           }
           if (rng.roll(config.workerProbSend) && acquaintances.nonEmpty) {
             val work = state
-            for (i <- 1 to rng.randNat(config.maxSendsInOneTurn)) {
+            for (_ <- 1 to rng.randNat(config.maxSendsInOneTurn)) {
               val recipient = rng.select(acquaintances)
               sendWorkMsg(recipient, work)
             }
@@ -176,12 +175,12 @@ object RandomWorkers {
           }
           if (rng.roll(config.workerProbDeactivate)) {
             val locals = rng.selectDistinct(acquaintances, config.maxDeactivatedInOneTurn).toSeq
-            ctx.release(locals)
+            //ctx.release(locals)
             for (worker <- locals)
               remove(worker, acquaintances)
           }
           if (rng.roll(config.workerProbDeactivateAll)) {
-            ctx.release(acquaintances)
+            //ctx.release(acquaintances)
             acquaintances.clear()
           }
           this
@@ -198,7 +197,7 @@ object RandomWorkers {
         workerNodes: Map[String, unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
         isWarmup: Boolean
     ): unmanaged.Behavior[RemoteSpawner.Command[Protocol]] =
-      scaladsl.Behaviors.setup[RemoteSpawner.Command[Protocol]] { ctx =>
+      typed.scaladsl.Behaviors.setup[RemoteSpawner.Command[Protocol]] { ctx =>
         benchmark ! ClusterBenchmark.OrchestratorReady()
 
         ctx.spawn(leadManager(benchmark, workerNodes.values), "manager0")
@@ -249,7 +248,7 @@ object RandomWorkers {
       // Spawn the other managers and send those managers references to one another
       if (workerNodes.nonEmpty) {
         peers = mutable.ArrayBuffer.from(
-          for ((node, i) <- workerNodes.zipWithIndex)
+          for ((node, _) <- workerNodes.zipWithIndex)
             yield ctx.spawnRemote("followerManager", node)
         )
         for (peer <- peers) {
@@ -278,8 +277,8 @@ object RandomWorkers {
             }
             benchmark ! OrchestratorDone(results = queryTimes.mkString("\n"), filename = config.queryTimesFile)
             done = true
-            ctx.release(localWorkers)
-            ctx.release(remoteWorkers)
+            //ctx.release(localWorkers)
+            //ctx.release(remoteWorkers)
             localWorkers.clear()
             remoteWorkers.clear()
           }
@@ -338,8 +337,8 @@ object RandomWorkers {
         if (rng.roll(config.managerProbDeactivate)) {
           val locals = rng.selectDistinct(localWorkers, config.maxDeactivatedInOneTurn).toSeq
           val remotes = rng.selectDistinct(remoteWorkers, config.maxDeactivatedInOneTurn).toSeq
-          ctx.release(locals)
-          ctx.release(remotes)
+          //ctx.release(locals)
+          //ctx.release(remotes)
           for (worker <- locals)
             remove(worker, localWorkers)
           for (worker <- remotes) {
@@ -348,8 +347,8 @@ object RandomWorkers {
         }
         if (rng.roll(config.managerProbDeactivateAll)
           || localWorkers.size + remoteWorkers.size > config.managerMaxAcquaintances) {
-          ctx.release(localWorkers)
-          ctx.release(remoteWorkers)
+          //ctx.release(localWorkers)
+          //ctx.release(remoteWorkers)
           localWorkers.clear()
           remoteWorkers.clear()
         }

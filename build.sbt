@@ -1,8 +1,8 @@
-val org = "edu.illinois.osl"
+val org = "org.apache.pekko"
 val libVersion = "0.1.0-SNAPSHOT"
-val akkaVersion = "2.8.0-M3+18-6fadd9a8+20230727-1556-SNAPSHOT"
+val pekkoVersion = "1.1.2-uigc-SNAPSHOT"
 
-ThisBuild / scalaVersion     := "2.13.8"
+ThisBuild / scalaVersion     := "2.13.15"
 ThisBuild / version          := libVersion
 ThisBuild / organization     := org
 
@@ -11,12 +11,17 @@ lazy val bench = (project in file("."))
     name := "uigc-bench",
 
     libraryDependencies ++= Seq(
-        org %% "uigc" % libVersion,
-        "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
-        "com.typesafe.akka" %% "akka-cluster-typed" % akkaVersion,
-        "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion,
-        "ch.qos.logback" % "logback-classic" % "1.2.3",
-        "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
+      "org.apache.pekko" %% "pekko-actor-typed" % pekkoVersion,
+      "org.apache.pekko" %% "pekko-actor-testkit-typed" % pekkoVersion,
+      "org.apache.pekko" %% "pekko-cluster-typed" % pekkoVersion,
+      "org.apache.pekko" %% "pekko-serialization-jackson" % pekkoVersion,
+      "org.apache.pekko" %% "pekko-uigc" % pekkoVersion,
+      "org.apache.pekko" %% "pekko-slf4j" % pekkoVersion,
+      "ch.qos.logback" % "logback-classic" % "1.3.14",
+    ),
+    scalacOptions in Compile ++= Seq(
+      "-optimise",
+      "-Xdisable-assertions"
     ),
 
     resolvers += "Artima Maven Repository" at "https://repo.artima.com/releases",
