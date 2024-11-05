@@ -112,10 +112,10 @@ class ClusterBenchmark[T](
     // Override the configuration of the port when specified as program argument
     val config = ConfigFactory
       .parseString(s"""
-      akka.remote.artery.canonical.hostname=$hostname
-      akka.remote.artery.canonical.port=$port
-      akka.cluster.roles = [$role]
-      akka.cluster.seed-nodes = ["akka://ClusterSystem@$leaderhost:25251"]
+      pekko.remote.artery.canonical.hostname=$hostname
+      pekko.remote.artery.canonical.port=$port
+      pekko.cluster.roles = [$role]
+      pekko.cluster.seed-nodes = ["pekko://ClusterSystem@$leaderhost:25251"]
       """)
       .withFallback(ConfigFactory.load("cluster"))
 
