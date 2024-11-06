@@ -60,26 +60,4 @@ public final class TrapezoidalConfig {
         final double r = c * d;
         return r;
     }
-
-    protected static final class WorkMessage {
-        final double l;
-        final double r;
-        final double h;
-
-        public WorkMessage(final double l, final double r, final double h) {
-            this.l = l;
-            this.r = r;
-            this.h = h;
-        }
-    }
-
-    protected static final class ResultMessage {
-        public final double result;
-        public final int workerId;
-
-        public ResultMessage(final double result, final int workerId) {
-            this.result = result;
-            this.workerId = workerId;
-        }
-    }
 }

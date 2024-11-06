@@ -44,24 +44,4 @@ public final class CigaretteSmokerConfig {
 
         return test;
     }
-
-    protected static class StartSmoking {
-        public final int busyWaitPeriod;
-
-        public StartSmoking(final int busyWaitPeriod) {
-            this.busyWaitPeriod = busyWaitPeriod;
-        }
-    }
-
-    protected static class StartedSmoking {
-        public static StartedSmoking ONLY = new StartedSmoking();
-    }
-
-    protected static class StartMessage {
-        public static StartMessage ONLY = new StartMessage();
-    }
-
-    protected static class ExitMessage {
-        public static ExitMessage ONLY = new ExitMessage();
-    }
 }

@@ -54,29 +54,4 @@ public final class SleepingBarberConfig {
 
         return test;
     }
-
-    protected static class Full {
-        public static Full ONLY = new Full();
-    }
-
-    protected static class Wait {
-        public static Wait ONLY = new Wait();
-    }
-
-    protected static class Next {
-        public static Next ONLY = new Next();
-    }
-
-    protected static class Start {
-        public static Start ONLY = new Start();
-    }
-
-    protected static class Done {
-        public static Done ONLY = new Done();
-    }
-
-    protected static class Exit {
-        public static Exit ONLY = new Exit();
-    }
-
 }

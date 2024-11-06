@@ -61,33 +61,4 @@ public final class PiPrecisionConfig {
         term = term.divide(sixteen.pow(k), scale, roundMode);
         return term;
     }
-
-    // Message classes
-    protected static class StartMessage {
-        protected static StartMessage ONLY = new StartMessage();
-    }
-
-    protected static class StopMessage {
-        protected static StopMessage ONLY = new StopMessage();
-    }
-
-    protected static class WorkMessage {
-        public final int scale;
-        public final int term;
-
-        public WorkMessage(final int scale, final int term) {
-            this.scale = scale;
-            this.term = term;
-        }
-    }
-
-    protected static class ResultMessage {
-        public final BigDecimal result;
-        public final int workerId;
-
-        public ResultMessage(final BigDecimal result, final int workerId) {
-            this.result = result;
-            this.workerId = workerId;
-        }
-    }
 }

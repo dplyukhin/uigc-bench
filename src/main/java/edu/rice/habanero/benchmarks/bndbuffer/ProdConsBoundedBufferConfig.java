@@ -97,34 +97,4 @@ public final class ProdConsBoundedBufferConfig {
         PRODUCER,
         CONSUMER
     }
-
-    protected static class DataItemMessage {
-        public final double data;
-        public final Object producer;
-
-        DataItemMessage(final double data, final Object producer) {
-            this.data = data;
-            this.producer = producer;
-        }
-    }
-
-    protected static class ProduceDataMessage {
-        protected static ProduceDataMessage ONLY = new ProduceDataMessage();
-    }
-
-    protected static class ProducerExitMessage {
-        protected static ProducerExitMessage ONLY = new ProducerExitMessage();
-    }
-
-    protected static class ConsumerAvailableMessage {
-        public final Object consumer;
-
-        ConsumerAvailableMessage(final Object consumer) {
-            this.consumer = consumer;
-        }
-    }
-
-    protected static class ConsumerExitMessage {
-        protected static ConsumerExitMessage ONLY = new ConsumerExitMessage();
-    }
 }

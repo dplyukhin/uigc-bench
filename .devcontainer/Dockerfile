@@ -8,6 +8,6 @@ RUN apt-get install -y git python3 python3-pip
 RUN pip3 install pandas matplotlib numpy
 
 # Build Pekko/UIGC
-RUN git clone --depth 1 https://github.com/dplyukhin/uigc-pekko.git /uigc-pekko
-WORKDIR /uigc-pekko
+RUN git clone --depth 1 https://github.com/dplyukhin/uigc-pekko.git ~/uigc-pekko
+WORKDIR ~/uigc-pekko
 RUN sbt publishLocal

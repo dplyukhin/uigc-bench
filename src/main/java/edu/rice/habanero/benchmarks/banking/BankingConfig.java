@@ -43,37 +43,4 @@ public final class BankingConfig {
         System.out.printf(BenchmarkRunner.argOutputFormat, "debug", debug);
     }
 
-    protected static final class StartMessage {
-        protected static StartMessage ONLY = new StartMessage();
-    }
-
-    protected static final class StopMessage {
-        protected static StopMessage ONLY = new StopMessage();
-    }
-
-    protected static final class ReplyMessage {
-        protected static ReplyMessage ONLY = new ReplyMessage();
-    }
-
-    protected static class DebitMessage {
-        public final Object sender;
-        public final double amount;
-
-        public DebitMessage(final Object sender, final double amount) {
-            this.sender = sender;
-            this.amount = amount;
-        }
-    }
-
-    protected static class CreditMessage {
-        public final Object sender;
-        public final double amount;
-        public final Object recipient;
-
-        public CreditMessage(final Object sender, final double amount, final Object recipient) {
-            this.sender = sender;
-            this.amount = amount;
-            this.recipient = recipient;
-        }
-    }
 }

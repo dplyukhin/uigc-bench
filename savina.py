@@ -14,21 +14,40 @@ import numpy as np
 
 # Which benchmarks to run, and which parameters to run them on.
 benchmarks = {
-    "apsp.ApspAkkaGCActorBenchmark": [100, 200, 300, 400, 500],
-    "astar.GuidedSearchAkkaGCActorBenchmark": [10, 20, 30, 40, 50],
-    "count.CountingAkkaGCActorBenchmark": [1000000, 2000000, 3000000, 4000000, 5000000],
-    "fib.FibonacciAkkaGCActorBenchmark": [22, 23, 24, 25, 26], 
-    "nqueenk.NQueensAkkaGCActorBenchmark": [9, 10, 11, 12, 13],
-    "quicksort.QuickSortAkkaGCActorBenchmark": [500000, 1000000, 1500000, 2000000, 2500000],
-    "radixsort.RadixSortAkkaGCActorBenchmark": [50000, 60000, 70000, 80000, 90000],
-    "recmatmul.MatMulAkkaGCActorBenchmark": [1024, 512, 256, 128, 64],
+    "apsp.ApspAkkaGCActorBenchmark": [500],   # [100, 200, 300, 400, 500],
+    "astar.GuidedSearchAkkaGCActorBenchmark": [50],    # [10, 20, 30, 40, 50],
+    "banking.BankingAkkaManualStashActorBenchmark": [50_000],
+    "barber.SleepingBarberAkkaActorBenchmark": [5_000],
+    "big.BigAkkaActorBenchmark": [2_000],
+    "bitonicsort.BitonicSortAkkaActorBenchmark": [4096],
+    "bndbuffer.ProduConsAkkaActorBenchmark": [1000],
+    "chameneos.ChameneosAkkaActorBenchmark": [400_000],
+    "cigsmok.CigaretteSmokerAkkaActorBenchmark": [1000],
+    "concdict.DictionaryAkkaActorBenchmark": [10_000],
+    "concsll.SortedListAkkaActorBenchmark": [8000],
+    "count.CountingAkkaGCActorBenchmark": [3_000_000],   # [1000000, 2000000, 3000000, 4000000, 5000000],
+    "facloc.FacilityLocationAkkaActorBenchmark": [100_000],
+    "fib.FibonacciAkkaGCActorBenchmark": [25],     # [22, 23, 24, 25, 26],
+    "filterbank.FilterBankAkkaActorBenchmark": [34816],
+    "fjcreate.ForkJoinAkkaActorBenchmark": [200_000],
+    "fjthrput.ThroughputAkkaActorBenchmark": [50_000],
+    "logmap.LogisticMapAkkaManualStashActorBenchmark": [25_000],
+    "nqueenk.NQueensAkkaGCActorBenchmark": [13],    # [9, 10, 11, 12, 13],
+    "philosopher.PhilosopherAkkaActorBenchmark": [20],
+    "pingpong.PingPongAkkaActorBenchmark": [500_000],
+    "piprecision.PiPrecisionAkkaActorBenchmark": [5_000],
+    "quicksort.QuickSortAkkaGCActorBenchmark": [2_000_000],     # [500000, 1000000, 1500000, 2000000, 2500000],
+    "radixsort.RadixSortAkkaGCActorBenchmark": [100_000],       # [50000, 60000, 70000, 80000, 90000],
+    "recmatmul.MatMulAkkaGCActorBenchmark": [1024],    # [1024, 512, 256, 128, 64],
+    "sieve.SieveAkkaActorBenchmark": [100_000],
+    #"sor.SucOverRelaxAkkaActorBenchmark": [0],        # Skipped due to deadlock
+    "threadring.ThreadRingAkkaActorBenchmark": [100],
+    "trapezoid.TrapezoidAkkaActorBenchmark": [10_000_000],
+    "uct.UctAkkaActorBenchmark": [200_000],
 }
 
 # Which benchmarks to skip in the simple evaluation.
 skippable_benchmarks = [
-    "astar.GuidedSearchAkkaGCActorBenchmark",    # This one is slow.
-    "nqueenk.NQueensAkkaGCActorBenchmark",       # This one is slow.
-    "radixsort.RadixSortAkkaGCActorBenchmark",   # This one is not consistent.
 ]
 
 # Pyplot configuration.
@@ -43,12 +62,34 @@ gc_types = ["nogc", "wrc", "crgc-onblock", "crgc-wave"]
 opts = {
     "apsp.ApspAkkaGCActorBenchmark": "-n",
     "astar.GuidedSearchAkkaGCActorBenchmark": "-g",
+    "banking.BankingAkkaManualStashActorBenchmark": "-n",
+    "barber.SleepingBarberAkkaActorBenchmark": "-n",
+    "big.BigAkkaActorBenchmark": "-n",
+    "bitonicsort.BitonicSortAkkaActorBenchmark": "-n",
+    "bndbuffer.ProduConsAkkaActorBenchmark": "-ipp",
+    "chameneos.ChameneosAkkaActorBenchmark": "-m",
+    "cigsmok.CigaretteSmokerAkkaActorBenchmark": "-r",
+    "concdict.DictionaryAkkaActorBenchmark": "-m",
+    "concsll.SortedListAkkaActorBenchmark": "-m",
     "count.CountingAkkaGCActorBenchmark": "-n",
+    "facloc.FacilityLocationAkkaActorBenchmark": "-n",
     "fib.FibonacciAkkaGCActorBenchmark": "-n",
+    "filterbank.FilterBankAkkaActorBenchmark": "-sim",
+    "fjcreate.ForkJoinAkkaActorBenchmark": "-n",
+    "fjthrput.ThroughputAkkaActorBenchmark": "-n",
+    "logmap.LogisticMapAkkaManualStashActorBenchmark": "-t",
     "nqueenk.NQueensAkkaGCActorBenchmark": "-n",
+    "philosopher.PhilosopherAkkaActorBenchmark": "-n",
+    "pingpong.PingPongAkkaActorBenchmark": "-n",
+    "piprecision.PiPrecisionAkkaActorBenchmark": "-p",
     "quicksort.QuickSortAkkaGCActorBenchmark": "-n",
     "radixsort.RadixSortAkkaGCActorBenchmark": "-n",
     "recmatmul.MatMulAkkaGCActorBenchmark": "-n",
+    "sieve.SieveAkkaActorBenchmark": "-n",
+    "sor.SucOverRelaxAkkaActorBenchmark": "-n",
+    "threadring.ThreadRingAkkaActorBenchmark": "-n",
+    "trapezoid.TrapezoidAkkaActorBenchmark": "-n",
+    "uct.UctAkkaActorBenchmark": "-nodes"
 }
 
 def raw_time_filename(benchmark, param, gc_type):
@@ -320,14 +361,14 @@ if __name__ == "__main__":
         bms = [bm for bm in benchmarks if bm not in skippable_benchmarks]
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.run_time_benchmarks()
-        runner.process_time_data()
-        runner.plot_time_data()
+        #runner.process_time_data()
+        #runner.plot_time_data()
     elif args.command == "full_eval":
         bms = benchmarks.keys()
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.run_time_benchmarks()
-        runner.process_time_data()
-        runner.plot_time_data()
+        #runner.process_time_data()
+        #runner.plot_time_data()
     else:
         parser.print_help()
 

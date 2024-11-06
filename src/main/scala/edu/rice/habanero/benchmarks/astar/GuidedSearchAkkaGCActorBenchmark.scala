@@ -88,12 +88,12 @@ object GuidedSearchAkkaGCActorBenchmark {
       theMsg match {
         case workMessage: WorkMessage =>
           sendWork(workMessage)
-        case _: ReceivedMessage.type =>
+        case ReceivedMessage =>
           numWorkCompleted += 1
           if (numWorkCompleted == numWorkSent) {
             latch.countDown()
           }
-        case _: DoneMessage.type =>
+        case DoneMessage =>
           latch.countDown()
         case _ =>
       }

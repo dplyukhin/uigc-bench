@@ -41,6 +41,9 @@ object BigAkkaActorBenchmark {
   }
 
   trait Msg extends Message
+  case class Rfmsg(actor: ActorRef[Msg]) extends Msg {
+    override def refs: Iterable[ActorRef[_]] = Some(actor)
+  }
   case class NeighborMessage(neighbors: Array[ActorRef[Msg]]) extends Msg {
     def refs: Iterable[ActorRef[_]] = neighbors
   }
@@ -53,7 +56,8 @@ object BigAkkaActorBenchmark {
       val sinkActor = ctx.spawnAnonymous(Behaviors.setup[Msg](ctx => new SinkActor(BigConfig.W, ctx)))
 
       val bigActors = Array.tabulate[ActorRef[Msg]](BigConfig.W)(i => {
-        val loopActor = ctx.spawnAnonymous(Behaviors.setup[Msg](ctx => new BigActor(i, BigConfig.N, sinkActor, latch, ctx)))
+        val loopActor = ctx.spawnAnonymous(Behaviors.setup[Msg](ctx => new BigActor(i, BigConfig.N, latch, ctx)))
+        loopActor ! Rfmsg(ctx.createRef(sinkActor, loopActor))
         loopActor
       })
 
@@ -74,9 +78,9 @@ object BigAkkaActorBenchmark {
     def process(msg: Msg): Unit = ()
   }
 
-  private class BigActor(id: Int, numMessages: Int, sinkActor: ActorRef[Msg], latch: CountDownLatch, ctx: ActorContext[Msg])
+  private class BigActor(id: Int, numMessages: Int, latch: CountDownLatch, ctx: ActorContext[Msg])
     extends GCActor[Msg](ctx) {
-
+    var sinkActor: ActorRef[Msg] = _
     private var numPings = 0
     private var expPinger = -1
     private val random = new PseudoRandom(id)
@@ -87,6 +91,7 @@ object BigAkkaActorBenchmark {
 
     override def process(msg: Msg) {
       msg match {
+        case Rfmsg(x) => this.sinkActor = x
         case pm: PingMessage =>
 
           val sender = neighbors(pm.sender)

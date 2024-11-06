@@ -53,38 +53,4 @@ public final class LogisticMapConfig {
     protected static double computeNextTerm(final double curTerm, final double rate) {
         return rate * curTerm * (1 - curTerm);
     }
-
-    protected static final class StartMessage {
-        protected static StartMessage ONLY = new StartMessage();
-    }
-
-    protected static final class StopMessage {
-        protected static StopMessage ONLY = new StopMessage();
-    }
-
-    protected static final class NextTermMessage {
-        protected static NextTermMessage ONLY = new NextTermMessage();
-    }
-
-    protected static final class GetTermMessage {
-        protected static GetTermMessage ONLY = new GetTermMessage();
-    }
-
-    protected static class ComputeMessage {
-        public final Object sender;
-        public final double term;
-
-        public ComputeMessage(final Object sender, final double term) {
-            this.sender = sender;
-            this.term = term;
-        }
-    }
-
-    protected static class ResultMessage {
-        public final double term;
-
-        public ResultMessage(final double term) {
-            this.term = term;
-        }
-    }
 }
