@@ -28,7 +28,7 @@ benchmarks = {
     #"count.CountingAkkaGCActorBenchmark": [3_000_000],   # [1000000, 2000000, 3000000, 4000000, 5000000],
     "facloc.FacilityLocationAkkaActorBenchmark": [100_000],
     #"fib.FibonacciAkkaGCActorBenchmark": [25],     # [22, 23, 24, 25, 26],
-    "filterbank.FilterBankAkkaActorBenchmark": [34816],
+    #"filterbank.FilterBankAkkaActorBenchmark": [34816],         # Skipped due to deadlocks
     #"fjcreate.ForkJoinAkkaActorBenchmark": [200_000],
     #"fjthrput.ThroughputAkkaActorBenchmark": [50_000],
     #"logmap.LogisticMapAkkaManualStashActorBenchmark": [25_000],
