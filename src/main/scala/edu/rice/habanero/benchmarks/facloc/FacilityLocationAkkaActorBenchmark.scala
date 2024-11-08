@@ -65,15 +65,15 @@ object FacilityLocationAkkaActorBenchmark {
 
       val rootQuadrant = ctx.spawnAnonymous(Behaviors.setup[Msg]( ctx => new QuadrantActor(
         Position.ROOT, boundingBox, threshold, 0,
-        new java.util.ArrayList[Point](), 1, -1, new java.util.ArrayList[Point](), ctx)))
+        new java.util.ArrayList[Point](), 1, -1, new java.util.ArrayList[Point](), latch, ctx)))
 
-      val producer = ctx.spawnAnonymous(Behaviors.setup[Msg] { ctx => new ProducerActor(latch, ctx) })
+      val producer = ctx.spawnAnonymous(Behaviors.setup[Msg] { ctx => new ProducerActor(ctx) })
       producer ! Rfmsg(ctx.createRef(rootQuadrant, producer))
     }
     override def process(msg: Msg): Unit = ()
   }
 
-  private class ProducerActor(latch: CountDownLatch, ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
+  private class ProducerActor(ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
 
     private var consumer: ActorRef[Msg] = _
     private var itemsProduced = 0
@@ -92,7 +92,8 @@ object FacilityLocationAkkaActorBenchmark {
           if (itemsProduced < FacilityLocationConfig.NUM_POINTS) {
             produceCustomer()
           } else {
-            latch.countDown()
+            consumer ! RequestExitMsg()
+            exit()
           }
       }
     }
@@ -105,7 +106,9 @@ object FacilityLocationAkkaActorBenchmark {
                               initLocalFacilities: java.util.List[Point],
                               initKnownFacilities: Int,
                               initMaxDepthOfKnownOpenFacility: Int,
-                              initCustomers: java.util.List[Point], ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
+                              initCustomers: java.util.List[Point],
+                              latch: CountDownLatch,
+                              ctx: ActorContext[Msg]) extends GCActor[Msg](ctx) {
 
     private var parent: ActorRef[Msg] = _
     // the facility associated with this quadrant if it were to open
@@ -296,25 +299,25 @@ object FacilityLocationAkkaActorBenchmark {
       val customers1 = new util.ArrayList[Point](supportCustomers)
       val firstChild = ctx.spawnAnonymous(Behaviors.setup[Msg] { ctx => new QuadrantActor(
         Position.TOP_LEFT, firstBoundary, threshold, depth + 1,
-        localFacilities, knownFacilities, maxDepthOfKnownOpenFacility, customers1, ctx)})
+        localFacilities, knownFacilities, maxDepthOfKnownOpenFacility, customers1, latch, ctx)})
       firstChild ! Rfmsg(ctx.createRef(ctx.self, firstChild))
 
       val customers2 = new util.ArrayList[Point](supportCustomers)
       val secondChild = ctx.spawnAnonymous(Behaviors.setup[Msg] { ctx => new QuadrantActor(
         Position.TOP_RIGHT, secondBoundary, threshold, depth + 1,
-        localFacilities, knownFacilities, maxDepthOfKnownOpenFacility, customers2, ctx)})
+        localFacilities, knownFacilities, maxDepthOfKnownOpenFacility, customers2, latch, ctx)})
       secondChild ! Rfmsg(ctx.createRef(ctx.self, secondChild))
 
       val customers3 = new util.ArrayList[Point](supportCustomers)
       val thirdChild = ctx.spawnAnonymous(Behaviors.setup[Msg] { ctx => new QuadrantActor(
         Position.BOT_LEFT, thirdBoundary, threshold, depth + 1,
-        localFacilities, knownFacilities, maxDepthOfKnownOpenFacility, customers3, ctx)})
+        localFacilities, knownFacilities, maxDepthOfKnownOpenFacility, customers3, latch, ctx)})
       thirdChild ! Rfmsg(ctx.createRef(ctx.self, thirdChild))
 
       val customers4 = new util.ArrayList[Point](supportCustomers)
       val fourthChild = ctx.spawnAnonymous(Behaviors.setup[Msg] { ctx => new QuadrantActor(
         Position.BOT_RIGHT, fourthBoundary, threshold, depth + 1,
-        localFacilities, knownFacilities, maxDepthOfKnownOpenFacility, customers4, ctx)})
+        localFacilities, knownFacilities, maxDepthOfKnownOpenFacility, customers4, latch, ctx)})
       fourthChild ! Rfmsg(ctx.createRef(ctx.self, fourthChild))
 
       children = List[ActorRef[Msg]](firstChild, secondChild, thirdChild, fourthChild)
@@ -333,6 +336,7 @@ object FacilityLocationAkkaActorBenchmark {
       } else {
         val numFacilities = childrenFacilities + 1
         println("  Num Facilities: " + numFacilities + ", Num customers: " + facilityCustomers)
+        latch.countDown()
       }
       exit()
 
