@@ -15,34 +15,34 @@ import numpy as np
 # Which benchmarks to run, and which parameters to run them on.
 benchmarks = {
     "apsp.ApspAkkaGCActorBenchmark": [500],   # [100, 200, 300, 400, 500],
-    "astar.GuidedSearchAkkaGCActorBenchmark": [50],    # [10, 20, 30, 40, 50],
+    #"astar.GuidedSearchAkkaGCActorBenchmark": [50],    # [10, 20, 30, 40, 50],
     "banking.BankingAkkaManualStashActorBenchmark": [50_000],
-    "barber.SleepingBarberAkkaActorBenchmark": [5_000],
-    "big.BigAkkaActorBenchmark": [2_000],
-    "bitonicsort.BitonicSortAkkaActorBenchmark": [4096],
+    #"barber.SleepingBarberAkkaActorBenchmark": [5_000],
+    #"big.BigAkkaActorBenchmark": [2_000],
+    #"bitonicsort.BitonicSortAkkaActorBenchmark": [4096],
     #"bndbuffer.ProdConsAkkaActorBenchmark": [1000],
     "chameneos.ChameneosAkkaActorBenchmark": [400_000],
-    "cigsmok.CigaretteSmokerAkkaActorBenchmark": [1000],
-    "concdict.DictionaryAkkaActorBenchmark": [10_000],
-    "concsll.SortedListAkkaActorBenchmark": [8000],
-    "count.CountingAkkaGCActorBenchmark": [3_000_000],   # [1000000, 2000000, 3000000, 4000000, 5000000],
+    #"cigsmok.CigaretteSmokerAkkaActorBenchmark": [1000],
+    #"concdict.DictionaryAkkaActorBenchmark": [10_000],
+    #"concsll.SortedListAkkaActorBenchmark": [8000],
+    #"count.CountingAkkaGCActorBenchmark": [3_000_000],   # [1000000, 2000000, 3000000, 4000000, 5000000],
     "facloc.FacilityLocationAkkaActorBenchmark": [100_000],
-    "fib.FibonacciAkkaGCActorBenchmark": [25],     # [22, 23, 24, 25, 26],
+    #"fib.FibonacciAkkaGCActorBenchmark": [25],     # [22, 23, 24, 25, 26],
     "filterbank.FilterBankAkkaActorBenchmark": [34816],
-    "fjcreate.ForkJoinAkkaActorBenchmark": [200_000],
-    "fjthrput.ThroughputAkkaActorBenchmark": [50_000],
-    "logmap.LogisticMapAkkaManualStashActorBenchmark": [25_000],
-    "nqueenk.NQueensAkkaGCActorBenchmark": [13],    # [9, 10, 11, 12, 13],
-    "philosopher.PhilosopherAkkaActorBenchmark": [20],
-    "pingpong.PingPongAkkaActorBenchmark": [500_000],
-    "piprecision.PiPrecisionAkkaActorBenchmark": [5_000],
-    "quicksort.QuickSortAkkaGCActorBenchmark": [2_000_000],     # [500000, 1000000, 1500000, 2000000, 2500000],
-    "radixsort.RadixSortAkkaGCActorBenchmark": [100_000],       # [50000, 60000, 70000, 80000, 90000],
-    "recmatmul.MatMulAkkaGCActorBenchmark": [1024],    # [1024, 512, 256, 128, 64],
-    "sieve.SieveAkkaActorBenchmark": [100_000],
+    #"fjcreate.ForkJoinAkkaActorBenchmark": [200_000],
+    #"fjthrput.ThroughputAkkaActorBenchmark": [50_000],
+    #"logmap.LogisticMapAkkaManualStashActorBenchmark": [25_000],
+    #"nqueenk.NQueensAkkaGCActorBenchmark": [13],    # [9, 10, 11, 12, 13],
+    #"philosopher.PhilosopherAkkaActorBenchmark": [20],
+    #"pingpong.PingPongAkkaActorBenchmark": [500_000],
+    #"piprecision.PiPrecisionAkkaActorBenchmark": [5_000],
+    #"quicksort.QuickSortAkkaGCActorBenchmark": [2_000_000],     # [500000, 1000000, 1500000, 2000000, 2500000],
+    #"radixsort.RadixSortAkkaGCActorBenchmark": [100_000],       # [50000, 60000, 70000, 80000, 90000],
+    #"recmatmul.MatMulAkkaGCActorBenchmark": [1024],    # [1024, 512, 256, 128, 64],
+    #"sieve.SieveAkkaActorBenchmark": [100_000],
     #"sor.SucOverRelaxAkkaActorBenchmark": [0],        # Skipped due to deadlock
-    "threadring.ThreadRingAkkaActorBenchmark": [100],
-    "trapezoid.TrapezoidalAkkaActorBenchmark": [10_000_000],
+    #"threadring.ThreadRingAkkaActorBenchmark": [100],
+    #"trapezoid.TrapezoidalAkkaActorBenchmark": [10_000_000],
     "uct.UctAkkaActorBenchmark": [200_000],
 }
 
@@ -233,7 +233,7 @@ def plot_ordinary_overhead(benchmark):
     ax.errorbar(x_values, nogc / nogc * 100 - 100, yerr=yerr, fmt='-o', capsize=5, label="no GC")
     ax.errorbar(x_values, crgc_onblk, fmt='-o', capsize=5, label="CRGC")
     ax.errorbar(x_values, wrc, fmt='-o', capsize=5, label="WRC")
-    #ax.errorbar(x_values, crgc_wave,  fmt='-o', capsize=5, label="CRGC (wave)")
+    ax.errorbar(x_values, crgc_wave,  fmt='-o', capsize=5, label="CRGC (wave)")
 
     # Add labels and title to the plot
     ax.set_xlabel('N')
@@ -274,7 +274,7 @@ def plot_ordinary_time(benchmark):
     ax.errorbar(x_values, nogc, yerr=nogc_err, fmt='-o', capsize=5, label="no GC")
     ax.errorbar(x_values, crgc_onblk, yerr=crgc_onblk_err, fmt='-o', capsize=5, label="CRGC")
     ax.errorbar(x_values, wrc, yerr=wrc_err, fmt='-o', capsize=5, label="WRC")
-    #ax.errorbar(x_values, crgc_wave,  yerr=crgc_wave_err,  fmt='-o', capsize=5, label="CRGC (wave)")
+    ax.errorbar(x_values, crgc_wave,  yerr=crgc_wave_err,  fmt='-o', capsize=5, label="CRGC (wave)")
 
     # Add labels and title to the plot
     ax.set_xlabel('N')
@@ -361,14 +361,14 @@ if __name__ == "__main__":
         bms = [bm for bm in benchmarks if bm not in skippable_benchmarks]
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.run_time_benchmarks()
-        #runner.process_time_data()
-        #runner.plot_time_data()
+        runner.process_time_data()
+        runner.plot_time_data()
     elif args.command == "full_eval":
         bms = benchmarks.keys()
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.run_time_benchmarks()
-        #runner.process_time_data()
-        #runner.plot_time_data()
+        runner.process_time_data()
+        runner.plot_time_data()
     elif args.command == "plot":
         bms = benchmarks.keys()
         runner = BenchmarkRunner(bms, gc_types, args)
