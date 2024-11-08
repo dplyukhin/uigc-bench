@@ -20,7 +20,7 @@ benchmarks = {
     "barber.SleepingBarberAkkaActorBenchmark": [5_000],
     "big.BigAkkaActorBenchmark": [2_000],
     "bitonicsort.BitonicSortAkkaActorBenchmark": [4096],
-    "bndbuffer.ProduConsAkkaActorBenchmark": [1000],
+    #"bndbuffer.ProdConsAkkaActorBenchmark": [1000],
     "chameneos.ChameneosAkkaActorBenchmark": [400_000],
     "cigsmok.CigaretteSmokerAkkaActorBenchmark": [1000],
     "concdict.DictionaryAkkaActorBenchmark": [10_000],
@@ -42,7 +42,7 @@ benchmarks = {
     "sieve.SieveAkkaActorBenchmark": [100_000],
     #"sor.SucOverRelaxAkkaActorBenchmark": [0],        # Skipped due to deadlock
     "threadring.ThreadRingAkkaActorBenchmark": [100],
-    "trapezoid.TrapezoidAkkaActorBenchmark": [10_000_000],
+    "trapezoid.TrapezoidalAkkaActorBenchmark": [10_000_000],
     "uct.UctAkkaActorBenchmark": [200_000],
 }
 
@@ -66,7 +66,7 @@ opts = {
     "barber.SleepingBarberAkkaActorBenchmark": "-n",
     "big.BigAkkaActorBenchmark": "-n",
     "bitonicsort.BitonicSortAkkaActorBenchmark": "-n",
-    "bndbuffer.ProduConsAkkaActorBenchmark": "-ipp",
+    "bndbuffer.ProdConsAkkaActorBenchmark": "-ipp",
     "chameneos.ChameneosAkkaActorBenchmark": "-m",
     "cigsmok.CigaretteSmokerAkkaActorBenchmark": "-r",
     "concdict.DictionaryAkkaActorBenchmark": "-m",
@@ -88,7 +88,7 @@ opts = {
     "sieve.SieveAkkaActorBenchmark": "-n",
     "sor.SucOverRelaxAkkaActorBenchmark": "-n",
     "threadring.ThreadRingAkkaActorBenchmark": "-n",
-    "trapezoid.TrapezoidAkkaActorBenchmark": "-n",
+    "trapezoid.TrapezoidalAkkaActorBenchmark": "-n",
     "uct.UctAkkaActorBenchmark": "-nodes"
 }
 
@@ -336,7 +336,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "command", 
-        choices=["simple_eval", "full_eval"], 
+        choices=["simple_eval", "full_eval", "plot"],
         help="What command to run."
     )
     parser.add_argument(
@@ -369,6 +369,11 @@ if __name__ == "__main__":
         runner.run_time_benchmarks()
         #runner.process_time_data()
         #runner.plot_time_data()
+    elif args.command == "plot":
+        bms = benchmarks.keys()
+        runner = BenchmarkRunner(bms, gc_types, args)
+        runner.process_time_data()
+        runner.plot_time_data()
     else:
         parser.print_help()
 
