@@ -15,34 +15,34 @@ import numpy as np
 # Which benchmarks to run, and which parameters to run them on.
 benchmarks = {
     "apsp.ApspAkkaGCActorBenchmark": [500],   # [100, 200, 300, 400, 500],
-    #"astar.GuidedSearchAkkaGCActorBenchmark": [50],    # [10, 20, 30, 40, 50],
+    "astar.GuidedSearchAkkaGCActorBenchmark": [50],    # [10, 20, 30, 40, 50],
     "banking.BankingAkkaManualStashActorBenchmark": [50_000],
-    #"barber.SleepingBarberAkkaActorBenchmark": [5_000],
-    #"big.BigAkkaActorBenchmark": [2_000],
-    #"bitonicsort.BitonicSortAkkaActorBenchmark": [4096],
-    #"bndbuffer.ProdConsAkkaActorBenchmark": [1000],
+    "barber.SleepingBarberAkkaActorBenchmark": [5_000],
+    "big.BigAkkaActorBenchmark": [2_000],
+    "bitonicsort.BitonicSortAkkaActorBenchmark": [4096],
+    "bndbuffer.ProdConsAkkaActorBenchmark": [1000],
     "chameneos.ChameneosAkkaActorBenchmark": [400_000],
-    #"cigsmok.CigaretteSmokerAkkaActorBenchmark": [1000],
-    #"concdict.DictionaryAkkaActorBenchmark": [10_000],
-    #"concsll.SortedListAkkaActorBenchmark": [8000],
-    #"count.CountingAkkaGCActorBenchmark": [3_000_000],   # [1000000, 2000000, 3000000, 4000000, 5000000],
+    "cigsmok.CigaretteSmokerAkkaActorBenchmark": [1000],
+    "concdict.DictionaryAkkaActorBenchmark": [10_000],
+    "concsll.SortedListAkkaActorBenchmark": [8000],
+    "count.CountingAkkaGCActorBenchmark": [3_000_000],   # [1000000, 2000000, 3000000, 4000000, 5000000],
     "facloc.FacilityLocationAkkaActorBenchmark": [100_000],
-    #"fib.FibonacciAkkaGCActorBenchmark": [25],     # [22, 23, 24, 25, 26],
+    "fib.FibonacciAkkaGCActorBenchmark": [25],     # [22, 23, 24, 25, 26],
     #"filterbank.FilterBankAkkaActorBenchmark": [34816],         # Skipped due to deadlocks
-    #"fjcreate.ForkJoinAkkaActorBenchmark": [200_000],
-    #"fjthrput.ThroughputAkkaActorBenchmark": [50_000],
-    #"logmap.LogisticMapAkkaManualStashActorBenchmark": [25_000],
-    #"nqueenk.NQueensAkkaGCActorBenchmark": [13],    # [9, 10, 11, 12, 13],
-    #"philosopher.PhilosopherAkkaActorBenchmark": [20],
-    #"pingpong.PingPongAkkaActorBenchmark": [500_000],
-    #"piprecision.PiPrecisionAkkaActorBenchmark": [5_000],
-    #"quicksort.QuickSortAkkaGCActorBenchmark": [2_000_000],     # [500000, 1000000, 1500000, 2000000, 2500000],
-    #"radixsort.RadixSortAkkaGCActorBenchmark": [100_000],       # [50000, 60000, 70000, 80000, 90000],
-    #"recmatmul.MatMulAkkaGCActorBenchmark": [1024],    # [1024, 512, 256, 128, 64],
-    #"sieve.SieveAkkaActorBenchmark": [100_000],
+    "fjcreate.ForkJoinAkkaActorBenchmark": [200_000],
+    "fjthrput.ThroughputAkkaActorBenchmark": [50_000],
+    "logmap.LogisticMapAkkaManualStashActorBenchmark": [25_000],
+    "nqueenk.NQueensAkkaGCActorBenchmark": [13],    # [9, 10, 11, 12, 13],
+    "philosopher.PhilosopherAkkaActorBenchmark": [20],
+    "pingpong.PingPongAkkaActorBenchmark": [500_000],
+    "piprecision.PiPrecisionAkkaActorBenchmark": [5_000],
+    "quicksort.QuickSortAkkaGCActorBenchmark": [2_000_000],     # [500000, 1000000, 1500000, 2000000, 2500000],
+    "radixsort.RadixSortAkkaGCActorBenchmark": [100_000],       # [50000, 60000, 70000, 80000, 90000],
+    "recmatmul.MatMulAkkaGCActorBenchmark": [1024],    # [1024, 512, 256, 128, 64],
+    "sieve.SieveAkkaActorBenchmark": [100_000],
     #"sor.SucOverRelaxAkkaActorBenchmark": [0],        # Skipped due to deadlock
-    #"threadring.ThreadRingAkkaActorBenchmark": [100],
-    #"trapezoid.TrapezoidalAkkaActorBenchmark": [10_000_000],
+    "threadring.ThreadRingAkkaActorBenchmark": [100],
+    "trapezoid.TrapezoidalAkkaActorBenchmark": [10_000_000],
     "uct.UctAkkaActorBenchmark": [200_000],
 }
 
@@ -315,7 +315,7 @@ class BenchmarkRunner:
         for benchmark in self.benchmarks:
             for param in benchmarks[benchmark]:
                 for gc_type in self.gc_types:
-                    run_count_benchmark(benchmark, gc_type, param)
+                    run_count_benchmark(benchmark, gc_type, param, self.args)
 
     def process_time_data(self):
         for bm in self.benchmarks:
