@@ -129,7 +129,7 @@ def run_benchmark(benchmark, gc_type, param, options, args):
         print(f"Invalid garbage collector type '{gc_type}'. Valid options are: {gc_types.join(', ')}")
         sys.exit(1)
 
-    subprocess.run(["sbt"] + gc_args + [f'runMain {classname} -iter {args.iter} {options} {opt} {param}'])
+    subprocess.run(["sbt", "-J-Xmx2G"] + gc_args + [f'runMain {classname} -iter {args.iter} {options} {opt} {param}'])
 
 def run_time_benchmark(benchmark, gc_type, param, args):
     filename = raw_time_filename(benchmark, param, gc_type)
