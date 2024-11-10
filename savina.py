@@ -122,9 +122,9 @@ def run_benchmark(benchmark, gc_type, param, options, args):
     elif gc_type == "mac":
         gc_args = ["-Duigc.engine=mac", "-Duigc.mac.cycle-detection=on"]
     elif gc_type == "crgc-onblock":
-        gc_args = ["-Dgc.crgc.collection-style=on-block", "-Duigc.engine=crgc"]
+        gc_args = ["-Duigc.crgc.collection-style=on-block", "-Duigc.engine=crgc"]
     elif gc_type == "crgc-wave":
-        gc_args = ["-Dgc.crgc.collection-style=wave", "-Duigc.engine=crgc"]
+        gc_args = ["-Duigc.crgc.collection-style=wave", "-Duigc.engine=crgc"]
     else:
         print(f"Invalid garbage collector type '{gc_type}'. Valid options are: {gc_types.join(', ')}")
         sys.exit(1)
