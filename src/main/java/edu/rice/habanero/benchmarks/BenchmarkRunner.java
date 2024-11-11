@@ -152,21 +152,21 @@ public class BenchmarkRunner {
 
         if (filename == null) {
             System.out.println("Missing filename. Dumping measurements to stdout.");
-            for (Double time : execTimes) {
+            for (Double time : rawExecTimes) {
                 System.out.println(time);
             }
         } else {
             System.out.println("Writing measurements to " + filename);
             try {
                 BufferedWriter writer = new BufferedWriter(new FileWriter(filename, true));
-                for (Double time : execTimes) {
+                for (Double time : rawExecTimes) {
                     writer.write(time + "\n");
                 }
                 writer.close();
             }
             catch (Exception e) {
                 System.out.println("Failed. Dumping to stdout.");
-                for (Double time : execTimes) {
+                for (Double time : rawExecTimes) {
                     System.out.println(time);
                 }
             }

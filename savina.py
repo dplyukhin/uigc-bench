@@ -129,7 +129,7 @@ def run_benchmark(benchmark, gc_type, param, options, args):
         print(f"Invalid garbage collector type '{gc_type}'. Valid options are: {gc_types.join(', ')}")
         sys.exit(1)
 
-    subprocess.run(["sbt", "-J-Xmx2G"] + gc_args + [f'runMain {classname} -iter {args.iter} {options} {opt} {param}'])
+    subprocess.run(["sbt", "-J-Xmx16G", "-J-XX:+UseZGC"] + gc_args + [f'runMain {classname} -iter {args.iter} {options} {opt} {param}'])
 
 def run_time_benchmark(benchmark, gc_type, param, args):
     filename = raw_time_filename(benchmark, param, gc_type)
@@ -155,6 +155,8 @@ def get_time_stats(benchmark, param, gc_type):
     filename = raw_time_filename(benchmark, param, gc_type)
     with open(filename) as file:
         lines = [float(line) for line in file]
+        # Only keep the 40% lowest values
+        lines = sorted(lines)[:int(len(lines) * 0.4)]
         return np.average(lines), np.std(lines)
 
 def process_time_data(benchmark, params):
@@ -302,10 +304,11 @@ class BenchmarkRunner:
             print("There are .csv files in the directory. Either remove them or re-run with the --append flag. Aborting.")
             sys.exit()
 
-        for benchmark in self.benchmarks:
-            for param in benchmarks[benchmark]:
-                for gc_type in self.gc_types:
-                    run_time_benchmark(benchmark, gc_type, param, self.args)
+        for i in range(self.args.invocations):
+            for benchmark in self.benchmarks:
+                for param in benchmarks[benchmark]:
+                    for gc_type in self.gc_types:
+                        run_time_benchmark(benchmark, gc_type, param, self.args)
 
     def run_count_benchmarks(self):
         if raw_counts_exist():
@@ -348,7 +351,13 @@ if __name__ == "__main__":
         "--iter",
         type=int,
         default=20,
-        help="Number of times to run each benchmark."
+        help="Number of times to run each benchmark PER JVM INVOCATION."
+    )
+    parser.add_argument(
+        "--invocations",
+        type=int,
+        default=6,
+        help="Number of JVM invocations to run for each benchmark."
     )
     args = parser.parse_args()
 
