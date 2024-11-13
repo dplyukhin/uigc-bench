@@ -91,6 +91,72 @@ opts = {
     "trapezoid.TrapezoidalAkkaActorBenchmark": "-n",
     "uct.UctAkkaActorBenchmark": "-nodes"
 }
+benchmarkName = {
+    "apsp.ApspAkkaGCActorBenchmark": "All-Pairs Shortest Path",
+    "astar.GuidedSearchAkkaGCActorBenchmark": "A-Star Search",
+    "banking.BankingAkkaManualStashActorBenchmark": "Bank Transaction",
+    "barber.SleepingBarberAkkaActorBenchmark": "Sleeping Barber",
+    "big.BigAkkaActorBenchmark": "Big",
+    "bitonicsort.BitonicSortAkkaActorBenchmark": "Bitonic Sort",
+    "bndbuffer.ProdConsAkkaActorBenchmark": "Producer-Consumer",
+    "chameneos.ChameneosAkkaActorBenchmark": "Chameneos",
+    "cigsmok.CigaretteSmokerAkkaActorBenchmark": "Cigarette Smokers",
+    "concdict.DictionaryAkkaActorBenchmark": "Concurrent Dictionary",
+    "concsll.SortedListAkkaActorBenchmark": "Concurrent Sorted Linked List",
+    "count.CountingAkkaGCActorBenchmark": "Counting Actor",
+    "facloc.FacilityLocationAkkaActorBenchmark": "Online Facility Location",
+    "fib.FibonacciAkkaGCActorBenchmark": "Recursive Fibonacci Tree",
+    "filterbank.FilterBankAkkaActorBenchmark": "Filter Bank",
+    "fjcreate.ForkJoinAkkaActorBenchmark": "Fork Join (Actor Creation)",
+    "fjthrput.ThroughputAkkaActorBenchmark": "Fork Join (Throughput)",
+    "logmap.LogisticMapAkkaManualStashActorBenchmark": "Logistic Map Series",
+    "nqueenk.NQueensAkkaGCActorBenchmark": "N-Queens",
+    "philosopher.PhilosopherAkkaActorBenchmark": "Dining Philosophers",
+    "pingpong.PingPongAkkaActorBenchmark": "Ping Pong",
+    "piprecision.PiPrecisionAkkaActorBenchmark": "Precise Pi Calculation",
+    "quicksort.QuickSortAkkaGCActorBenchmark": "Recursive Tree Quicksort",
+    "radixsort.RadixSortAkkaGCActorBenchmark": "Radix Sort",
+    "recmatmul.MatMulAkkaGCActorBenchmark": "Recursive Matrix Multiplication",
+    "sieve.SieveAkkaActorBenchmark": "Sieve of Eratosthenes",
+    "sor.SucOverRelaxAkkaActorBenchmark": "Successive Over-Relaxation",
+    "threadring.ThreadRingAkkaActorBenchmark": "Thread Ring",
+    "trapezoid.TrapezoidalAkkaActorBenchmark": "Trapezoidal Approximation",
+    "uct.UctAkkaActorBenchmark": "Unbalanced Cobwebbed Tree",
+}
+microBenchmarks = [
+    "big.BigAkkaActorBenchmark",
+    "chameneos.ChameneosAkkaActorBenchmark",
+    "count.CountingAkkaGCActorBenchmark",
+    "fib.FibonacciAkkaGCActorBenchmark",
+    "fjcreate.ForkJoinAkkaActorBenchmark",
+    "fjthrput.ThroughputAkkaActorBenchmark",
+    "pingpong.PingPongAkkaActorBenchmark",
+]
+concurrentBenchmarks = [
+    "banking.BankingAkkaManualStashActorBenchmark",
+    "barber.SleepingBarberAkkaActorBenchmark",
+    "bndbuffer.ProdConsAkkaActorBenchmark",
+    "cigsmok.CigaretteSmokerAkkaActorBenchmark",
+    "concdict.DictionaryAkkaActorBenchmark",
+    "concsll.SortedListAkkaActorBenchmark",
+    "logmap.LogisticMapAkkaManualStashActorBenchmark",
+    "philosopher.PhilosopherAkkaActorBenchmark",
+]
+parallelBenchmarks = [
+    "apsp.ApspAkkaGCActorBenchmark",
+    "astar.GuidedSearchAkkaGCActorBenchmark",
+    "bitonicsort.BitonicSortAkkaActorBenchmark",
+    "facloc.FacilityLocationAkkaActorBenchmark",
+    "nqueenk.NQueensAkkaGCActorBenchmark",
+    "piprecision.PiPrecisionAkkaActorBenchmark",
+    "quicksort.QuickSortAkkaGCActorBenchmark",
+    "radixsort.RadixSortAkkaGCActorBenchmark",
+    "recmatmul.MatMulAkkaGCActorBenchmark",
+    "sieve.SieveAkkaActorBenchmark",
+    "trapezoid.TrapezoidalAkkaActorBenchmark",
+    "uct.UctAkkaActorBenchmark",
+]
+
 
 def raw_time_filename(benchmark, param, gc_type):
     return f"raw_data/{benchmark}-{param}-{gc_type}.csv"
@@ -184,31 +250,47 @@ def process_time_data(benchmark, params):
     with open(filename, "w") as output:
         output.write('"N", "no GC", "no GC error", "WRC", "WRC error", "CRGC (on-block)", "CRGC error (on-block)", "CRGC (wave)", "CRGC error (wave)"\n')
         for param in params:
-            output.write(",".join([str(p) for p in d[param]]) + "\n") 
+            output.write(",".join([str(p) for p in d[param]]) + "\n")
 
-def count_messages(benchmark, param, gc_type):
-    filename = raw_count_filename(benchmark, param, gc_type)
-    subprocess.run(f"jfr print --json {filename} > {filename}.json", shell=True)
-    total_app_msgs = 0
-    total_ctrl_msgs = 0
-    with open(f'{filename}.json', 'r') as f:
-        data = json.load(f)
-        events = data['recording']['events']
-        for event in events:
-            if "mac.jfr.ActorBlockedEvent" in event['type']:
-                total_app_msgs += event['values']['appMsgCount']
-                total_ctrl_msgs += event['values']['ctrlMsgCount']
-            elif "mac.jfr.ProcessingMessages" in event['type']:
-                total_ctrl_msgs += event['values']['numMessages']
-            elif "crgc.jfr.EntryFlushEvent" in event['type']:
-                total_app_msgs += event['values']['recvCount']
-            elif "crgc.jfr.ProcessingEntries" in event['type']:
-                total_ctrl_msgs += event['values']['numEntries']
-    os.remove(f"{filename}.json")
+def shorten_benchmark_name(benchmark):
+    return benchmark.split(".")[0]
 
-    filename = processed_count_filename(benchmark, param, gc_type)
-    with open(filename, 'w') as f:
-        f.write(f'{total_app_msgs}, {total_ctrl_msgs}')
+def sigfigs(x, n):
+    """
+    Round x to n significant figures.
+    """
+    y = round(x, n - int(np.floor(np.log10(abs(x)))) - 1)
+    return int(y) if y.is_integer() else y
+
+def process_all_times(benchmarkList):
+    d = {}
+    for bm in benchmarkList:
+        d[bm] = {}
+        for param in benchmarks[bm]:
+            d[bm][param] = [shorten_benchmark_name(bm)]
+
+            nogc_avg, nogc_std = get_time_stats(bm, param, "nogc")
+            d[bm][param].append(sigfigs(nogc_avg / 1000, 2))
+
+            wrc_avg, _ = get_time_stats(bm, param, "wrc")
+            d[bm][param].append(sigfigs(wrc_avg / 1000, 2))
+
+            onblk_avg, onblk_std = get_time_stats(bm, param, "crgc-onblock")
+            d[bm][param].append(sigfigs(onblk_avg / 1000, 2))
+
+            wave_avg, wave_std = get_time_stats(bm, param, "crgc-wave")
+            d[bm][param].append(sigfigs(wave_avg / 1000, 2))
+
+            d[bm][param].append("±" + str(int(nogc_std / nogc_avg * 100)))
+            d[bm][param].append(int((wrc_avg / nogc_avg - 1) * 100))
+            d[bm][param].append(int((onblk_avg / nogc_avg - 1) * 100))
+            d[bm][param].append(int((wave_avg / nogc_avg - 1) * 100))
+
+    with open("processed_data/savina.csv", "w") as output:
+        output.write('Benchmark, no GC, WRC, CRGC-block, CRGC-wave, no GC (stdev), WRC, CRGC-block, CRGC-wave"\n')
+        for bm in benchmarkList:
+            for param in benchmarks[bm]:
+                output.write(",".join([str(p) for p in d[bm][param]]) + "\n")
 
 ############################## PLOTTING ##############################
 
@@ -324,6 +406,7 @@ class BenchmarkRunner:
         for bm in self.benchmarks:
             params = benchmarks[bm]
             process_time_data(bm, params)
+        process_all_times(self.benchmarks)
 
     def plot_time_data(self):
         for bm in self.benchmarks:
@@ -338,8 +421,8 @@ if __name__ == "__main__":
         description='Run Savina benchmarks and plot results.'
     )
     parser.add_argument(
-        "command", 
-        choices=["simple_eval", "full_eval", "plot"],
+        "command",
+        choices=["simple_eval", "full_eval", "process", "plot"],
         help="What command to run."
     )
     parser.add_argument(
@@ -378,6 +461,10 @@ if __name__ == "__main__":
         runner.run_time_benchmarks()
         runner.process_time_data()
         runner.plot_time_data()
+    elif args.command == "process":
+        bms = benchmarks.keys()
+        runner = BenchmarkRunner(bms, gc_types, args)
+        runner.process_time_data()
     elif args.command == "plot":
         bms = benchmarks.keys()
         runner = BenchmarkRunner(bms, gc_types, args)
