@@ -262,12 +262,21 @@ def sigfigs(x, n):
     y = round(x, n - int(np.floor(np.log10(abs(x)))) - 1)
     return int(y) if y.is_integer() else y
 
+def cellcolor(stdev, overhead):
+    # Assuming overhead is at most 10x the standard deviation,
+    # ratio is an integer between -60 and 60.
+    ratio = int((overhead / stdev) / 10 * 60)
+    if ratio < 0:
+        return f"\\cellcolor{{green!{abs(ratio)}}}{overhead}"
+    else:
+        return f"\\cellcolor{{red!{ratio}}}{overhead}"
+
 def process_all_times(benchmarkList):
     d = {}
     for bm in benchmarkList:
         d[bm] = {}
         for param in benchmarks[bm]:
-            d[bm][param] = [shorten_benchmark_name(bm)]
+            d[bm][param] = ["\\texttt{" + shorten_benchmark_name(bm) + "}"]
 
             nogc_avg, nogc_std = get_time_stats(bm, param, "nogc")
             d[bm][param].append(sigfigs(nogc_avg / 1000, 2))
@@ -281,16 +290,23 @@ def process_all_times(benchmarkList):
             wave_avg, wave_std = get_time_stats(bm, param, "crgc-wave")
             d[bm][param].append(sigfigs(wave_avg / 1000, 2))
 
-            d[bm][param].append("±" + str(int(nogc_std / nogc_avg * 100)))
-            d[bm][param].append(int((wrc_avg / nogc_avg - 1) * 100))
-            d[bm][param].append(int((onblk_avg / nogc_avg - 1) * 100))
-            d[bm][param].append(int((wave_avg / nogc_avg - 1) * 100))
+            percent_stdev = int(nogc_std / nogc_avg * 100)
+            d[bm][param].append("±" + str(percent_stdev))
+            d[bm][param].append(cellcolor(percent_stdev, int((wrc_avg / nogc_avg - 1) * 100)))
+            d[bm][param].append(cellcolor(percent_stdev, int((onblk_avg / nogc_avg - 1) * 100)))
+            d[bm][param].append(cellcolor(percent_stdev, int((wave_avg / nogc_avg - 1) * 100)))
 
-    with open("processed_data/savina.csv", "w") as output:
+    with open("processed_data/savina.tex", "w") as output:
         output.write('Benchmark, no GC, WRC, CRGC-block, CRGC-wave, no GC (stdev), WRC, CRGC-block, CRGC-wave"\n')
-        for bm in benchmarkList:
+        for bm in microBenchmarks:
             for param in benchmarks[bm]:
-                output.write(",".join([str(p) for p in d[bm][param]]) + "\n")
+                output.write(" & ".join([str(p) for p in d[bm][param]]) + "\\\\\n")
+        for bm in concurrentBenchmarks:
+            for param in benchmarks[bm]:
+                output.write(" & ".join([str(p) for p in d[bm][param]]) + "\\\\\n")
+        for bm in parallelBenchmarks:
+            for param in benchmarks[bm]:
+                output.write(" & ".join([str(p) for p in d[bm][param]]) + "\\\\\n")
 
 ############################## PLOTTING ##############################
 
