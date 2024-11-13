@@ -17,7 +17,7 @@ benchmarks = {
     "apsp.ApspAkkaGCActorBenchmark": [500],   # [100, 200, 300, 400, 500],
     "astar.GuidedSearchAkkaGCActorBenchmark": [50],    # [10, 20, 30, 40, 50],
     "banking.BankingAkkaManualStashActorBenchmark": [50_000],
-    "barber.SleepingBarberAkkaActorBenchmark": [5_000],
+    #"barber.SleepingBarberAkkaActorBenchmark": [5_000],         # Skipped due to unstable results
     "big.BigAkkaActorBenchmark": [2_000],
     "bitonicsort.BitonicSortAkkaActorBenchmark": [4096],
     "bndbuffer.ProdConsAkkaActorBenchmark": [1000],
@@ -63,7 +63,7 @@ opts = {
     "apsp.ApspAkkaGCActorBenchmark": "-n",
     "astar.GuidedSearchAkkaGCActorBenchmark": "-g",
     "banking.BankingAkkaManualStashActorBenchmark": "-n",
-    "barber.SleepingBarberAkkaActorBenchmark": "-n",
+    #"barber.SleepingBarberAkkaActorBenchmark": "-n",
     "big.BigAkkaActorBenchmark": "-n",
     "bitonicsort.BitonicSortAkkaActorBenchmark": "-n",
     "bndbuffer.ProdConsAkkaActorBenchmark": "-ipp",
@@ -95,7 +95,7 @@ benchmarkName = {
     "apsp.ApspAkkaGCActorBenchmark": "All-Pairs Shortest Path",
     "astar.GuidedSearchAkkaGCActorBenchmark": "A-Star Search",
     "banking.BankingAkkaManualStashActorBenchmark": "Bank Transaction",
-    "barber.SleepingBarberAkkaActorBenchmark": "Sleeping Barber",
+    #"barber.SleepingBarberAkkaActorBenchmark": "Sleeping Barber",
     "big.BigAkkaActorBenchmark": "Big",
     "bitonicsort.BitonicSortAkkaActorBenchmark": "Bitonic Sort",
     "bndbuffer.ProdConsAkkaActorBenchmark": "Producer-Consumer",
@@ -134,7 +134,7 @@ microBenchmarks = [
 ]
 concurrentBenchmarks = [
     "banking.BankingAkkaManualStashActorBenchmark",
-    "barber.SleepingBarberAkkaActorBenchmark",
+    #"barber.SleepingBarberAkkaActorBenchmark",
     "bndbuffer.ProdConsAkkaActorBenchmark",
     "cigsmok.CigaretteSmokerAkkaActorBenchmark",
     "concdict.DictionaryAkkaActorBenchmark",
@@ -263,9 +263,9 @@ def sigfigs(x, n):
     return int(y) if y.is_integer() else y
 
 def cellcolor(stdev, overhead):
-    # Assuming overhead is at most 10x the standard deviation,
+    # Assuming overhead is at most 20x the standard deviation,
     # ratio is an integer between -60 and 60.
-    ratio = int((overhead / stdev) / 10 * 60)
+    ratio = int((overhead / stdev) / 20 * 60)
     if ratio < 0:
         return f"\\cellcolor{{green!{abs(ratio)}}}{overhead}"
     else:
