@@ -263,13 +263,10 @@ def sigfigs(x, n):
     return int(y) if y.is_integer() else y
 
 def cellcolor(stdev, overhead):
-    # Assuming overhead is at most 20x the standard deviation,
-    # ratio is an integer between -60 and 60.
-    ratio = int((overhead / stdev) / 20 * 60)
-    if ratio < 0:
-        return f"\\cellcolor{{green!{abs(ratio)}}}{overhead}"
+    if overhead < 0:
+        return f"\\cellcolor{{green!{abs(overhead) / 200 * 60}}}{overhead}"
     else:
-        return f"\\cellcolor{{red!{ratio}}}{overhead}"
+        return f"\\cellcolor{{red!{overhead / 200 * 60}}}{overhead}"
 
 def process_all_times(benchmarkList):
     d = {}
