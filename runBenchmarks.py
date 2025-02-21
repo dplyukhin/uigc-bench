@@ -46,23 +46,11 @@ acyclic_mode = [
 
 
 def run_local(reqs_per_second, output_dir, mode):
-    jvm_gc_frequency = 100
-    filename = f"workers-rps-{reqs_per_second}"
 
-    # Add JFR options to SBT opts, saving the old value to be restored later.
-    original_sbt_opts = os.environ.get("SBT_OPTS", "")
-
-    for jvm_gc_frequency in [500, 1000]:
+    for jvm_gc_frequency in [100, 500, 1000]:
         for gc_type in ["crgc", "mac", "manual"]:
+            filename = f"workers-rps{reqs_per_second}-{gc_type}-f{jvm_gc_frequency}"
             with open(f'{output_dir}/{filename}.log', 'w') as log:
-
-                jfr_file = f"{output_dir}/{filename}.jfr"
-                jfr_settings = 'profile.jfc'
-
-                os.environ["SBT_OPTS"] = original_sbt_opts + \
-                    f" -XX:StartFlightRecording=filename={jfr_file},settings={jfr_settings},dumponexit=true"
-
-                print(f"Starting orchestrator")
                 process = subprocess.Popen(
                     ["sbt", "-J-Xmx16G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=1", f"-Duigc.engine={gc_type}",
                         f"-Drandom-workers.life-times-file=life-times-{gc_type}-f{jvm_gc_frequency}.csv",
@@ -70,13 +58,10 @@ def run_local(reqs_per_second, output_dir, mode):
                         f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
                     mode +
                     [f"runMain randomworkers.RandomWorkers orchestrator 0.0.0.0 0.0.0.0"],
-                    #stdout=log
+                    stdout=log
                 )
                 # Wait for the orchestrator to terminate
                 process.wait()
-
-            # Restore the original SBT_OPTS for the next iteration
-            os.environ["SBT_OPTS"] = original_sbt_opts
 
 
 def run_benchmark(reqs_per_second, output_dir, mode):
