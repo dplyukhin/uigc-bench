@@ -223,7 +223,7 @@ object RandomWorkers {
 
   private object Manager {
 
-    val actorLifeTimes: ConcurrentLinkedQueue[Long] = new ConcurrentLinkedQueue[Long]()
+    var actorLifeTimes: ConcurrentLinkedQueue[Long] = new ConcurrentLinkedQueue[Long]()
 
     /** 
      * Entry point for the "lead" spawn point, which runs on the orchestrator node. 
@@ -340,6 +340,7 @@ object RandomWorkers {
               dumpMeasurements(queryTimes.mkString("\n"), config.queryTimesFile)
               dumpMeasurements(lifeTimes.mkString("\n"), config.lifeTimesFile)
             }
+            Manager.actorLifeTimes = new ConcurrentLinkedQueue[Long]()
             done = true
             localWorkers.clear()
             remoteWorkers.clear()
