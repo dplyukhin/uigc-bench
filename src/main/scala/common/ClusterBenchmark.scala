@@ -37,17 +37,6 @@ object ClusterBenchmark {
     )
   }
 
-  private def dumpMeasurements(results: String, filename: String): Unit = {
-    if (filename == null) {
-      println("ERROR: Missing filename to dump iteration-specific measurements")
-    } else {
-      println(s"Writing measurements to $filename")
-      val writer = new BufferedWriter(new FileWriter(filename, true))
-      writer.write(results)
-      writer.close()
-    }
-  }
-
   private def dumpMeasurements(iterationTimes: Iterable[Double]): Unit = {
     val filename = System.getProperty("bench.filename")
     if (filename == null) {
@@ -88,7 +77,6 @@ class ClusterBenchmark[T](
   private val OrchestratorServiceKey = ServiceKey[Protocol[T]]("ClusterBench")
 
   def runBenchmark(args: Array[String]): Unit =
-    // Run them all on the same node
     if (args.length != 3) {
       println(
         s"Invalid arguments. Expected 3 args: {role} {hostname} {leader hostname}.\nGot ${args
@@ -250,8 +238,6 @@ class ClusterBenchmark[T](
       Behaviors.receive { (_, msg) =>
         msg match {
           case OrchestratorDone(results, filename) =>
-            if (!isWarmup && results != null)
-              dumpMeasurements(results = results, filename = filename)
             doneLatch.countDown()
             for ((_, worker) <- workerNodes)
               worker ! IterationDone()

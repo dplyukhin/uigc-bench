@@ -5,22 +5,32 @@ import com.typesafe.config.ConfigFactory
 import common.ClusterBenchmark.OrchestratorDone
 import common.ClusterBenchmark
 import org.apache.pekko.uigc.actor.typed._
+import org.apache.pekko.actor.typed.{Signal, PostStop}
 import org.apache.pekko.uigc.actor.typed.scaladsl._
 import randomworkers.jfr.AppMsgSerialization
 
 import scala.collection.mutable
 import scala.concurrent.duration.DurationInt
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.io.BufferedWriter
+import java.io.FileWriter
 
 object RandomWorkers {
 
-  def main(args: Array[String]): Unit =
-    ClusterBenchmark[RemoteSpawner.Command[Protocol]](
+  /** The main entry point for the benchmark. */
+  def main(args: Array[String]): Unit = {
+    // Each node has a manager that spawns workers and sends them work.
+    // Here we create the benchmark, passing in behaviors for the "leader" manager and for the "follower" managers (if they exist.)
+    val bench = ClusterBenchmark[RemoteSpawner.Command[Protocol]](
       Manager.leader,
       Map(
-        "manager1" -> Manager.spawnPoint(),
-        "manager2" -> Manager.spawnPoint()
+        // TODO Add a flag so I don't have to comment this out manually
+        //"manager1" -> Manager.spawnPoint(),
+        //"manager2" -> Manager.spawnPoint()
       )
-    ).runBenchmark(args)
+    )
+    bench.runBenchmark(args)
+  }
 
   trait Protocol extends Serializable with Message
 
@@ -77,6 +87,7 @@ object RandomWorkers {
 
   private class Config() {
     private val config = ConfigFactory.load("random-workers")
+    val jvmGCFrequency = config.getInt("random-workers.jvm-gc-frequency")
     val reqsPerSecond = config.getInt("random-workers.reqs-per-second")
     val maxWorkSizeBytes = config.getInt("random-workers.max-work-size-in-bytes")
     val maxAcqsInOneMsg = config.getInt("random-workers.max-acqs-per-msg")
@@ -86,6 +97,7 @@ object RandomWorkers {
     val managerMaxAcquaintances = config.getInt("random-workers.manager-max-acquaintances")
     val totalQueries = config.getInt("random-workers.total-queries")
     val queryTimesFile = config.getString("random-workers.query-times-file")
+    val lifeTimesFile = config.getString("random-workers.life-times-file")
     val managerProbSpawn = config.getDouble("random-workers.mgr-probabilities.spawn")
     val managerProbLocalSend = config.getDouble("random-workers.mgr-probabilities.local-send")
     val managerProbRemoteSend = config.getDouble("random-workers.mgr-probabilities.remote-send")
@@ -144,6 +156,15 @@ object RandomWorkers {
       private val rng = new Random()
       private val acquaintances: mutable.ArrayBuffer[ActorRef[Protocol]] = new mutable.ArrayBuffer()
       private var state: List[Int] = List.tabulate(config.maxWorkSizeBytes / 4)(i => i)
+      private val creationTime = System.nanoTime()
+
+      override def onSignal: PartialFunction[Signal,Behavior[Protocol]] = {
+        case PostStop =>
+          val killTime = System.nanoTime()
+          val lifeTimeMillis = (killTime - creationTime) / 1_000_000
+          Manager.actorLifeTimes.add(lifeTimeMillis)
+          this
+      }
 
       override def onMessage(msg: Protocol): Behavior[Protocol] = msg match {
         case Acquaint(workers) =>
@@ -175,12 +196,10 @@ object RandomWorkers {
           }
           if (rng.roll(config.workerProbDeactivate)) {
             val locals = rng.selectDistinct(acquaintances, config.maxDeactivatedInOneTurn).toSeq
-            //ctx.release(locals)
             for (worker <- locals)
               remove(worker, acquaintances)
           }
           if (rng.roll(config.workerProbDeactivateAll)) {
-            //ctx.release(acquaintances)
             acquaintances.clear()
           }
           this
@@ -188,10 +207,34 @@ object RandomWorkers {
     }
   }
 
+  private def dumpMeasurements(results: String, filename: String): Unit = {
+    if (filename == null) {
+      println("ERROR: Missing filename to dump iteration-specific measurements")
+    } else {
+      println(s"Writing measurements to $filename")
+      val writer = new BufferedWriter(new FileWriter(filename, true))
+      writer.write(results)
+      writer.close()
+    }
+  }
+
   private case object Ping extends Protocol with NoRefs
+  private case object TriggerGC extends Protocol with NoRefs
 
   private object Manager {
 
+    val actorLifeTimes: ConcurrentLinkedQueue[Long] = new ConcurrentLinkedQueue[Long]()
+
+    /** 
+     * Entry point for the "lead" spawn point, which runs on the orchestrator node. 
+     * The behavior does the following:
+     * 1. Notify the benchmark actor that we're ready to start.
+     * 2. Spawn the lead manager.
+     *
+     * @param benchmark A reference to the benchmark actor, which needs to be signalled when the benchmark is done.
+     * @param workerNodes A map of worker node names to their actor references.
+     * @param isWarmup Whether this is a warmup run.
+     */
     def leader(
         benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[RemoteSpawner.Command[Protocol]]],
         workerNodes: Map[String, unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
@@ -200,30 +243,42 @@ object RandomWorkers {
       typed.scaladsl.Behaviors.setup[RemoteSpawner.Command[Protocol]] { ctx =>
         benchmark ! ClusterBenchmark.OrchestratorReady()
 
-        ctx.spawn(leadManager(benchmark, workerNodes.values), "manager0")
+        // Spawn the manager actor.
+        ctx.spawn(leadManager(benchmark, workerNodes.values, isWarmup), "manager0")
 
-        spawnPoint()
+        // Become a spawn point, even though this node shouldn't be asked to spawn anything.
+        spawnPoint(isWarmup)
       }
 
+    /**
+     * Entry point for the "lead" manager. This manager receives Ping messages at a fixed rate.
+     * It's also responsible for spawning managers at the worker nodes.
+     */
     private def leadManager(
         benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[RemoteSpawner.Command[Protocol]]],
-        workerNodes: Iterable[unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]]
+        workerNodes: Iterable[unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
+        isWarmup: Boolean
     ): unmanaged.Behavior[Protocol] =
       Behaviors.withTimers[Protocol] { timers =>
         val config = new Config()
-        timers.startTimerAtFixedRate((), Ping, (1000000000 / config.reqsPerSecond).nanos)
+        timers.startTimerAtFixedRate(Ping, Ping, (1000000000 / config.reqsPerSecond).nanos)
+        if (config.jvmGCFrequency > 0)
+          timers.startTimerAtFixedRate(TriggerGC, TriggerGC, config.jvmGCFrequency.millis)
 
         Behaviors.setupRoot[Protocol] { ctx =>
-          new ManagerActor(ctx, config, workerNodes, benchmark)
+          new ManagerActor(ctx, config, workerNodes, benchmark, isWarmup)
         }
       }
 
-    def spawnPoint(): unmanaged.Behavior[RemoteSpawner.Command[Protocol]] =
+    /**
+     * Entry point for a spawn point. A spawn point will spawn a manager actor when asked.
+     */
+    def spawnPoint(isWarmup: Boolean): unmanaged.Behavior[RemoteSpawner.Command[Protocol]] =
       RemoteSpawner(Map(
         "followerManager" ->
           (ctx => {
             val config = new Config()
-            new ManagerActor(ctx, config, Nil, null)
+            new ManagerActor(ctx, config, Nil, null, isWarmup)
           })
       ))
 
@@ -231,7 +286,8 @@ object RandomWorkers {
         ctx: ActorContext[Protocol],
         config: Config,
         workerNodes: Iterable[unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
-        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[RemoteSpawner.Command[Protocol]]]
+        benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[RemoteSpawner.Command[Protocol]]],
+        isWarmup: Boolean
     ) extends AbstractBehavior[Protocol](ctx) {
 
       private val rng = new Random()
@@ -245,7 +301,8 @@ object RandomWorkers {
       private val isLeader = benchmark != null
       private var done = false
 
-      // Spawn the other managers and send those managers references to one another
+      // If this is the leader manager (i.e. the manager on the orchestrator node), 
+      // spawn the other managers and send those managers references to one another.
       if (workerNodes.nonEmpty) {
         peers = mutable.ArrayBuffer.from(
           for ((node, _) <- workerNodes.zipWithIndex)
@@ -259,6 +316,7 @@ object RandomWorkers {
       }
 
       override def onMessage(msg: Protocol): Behavior[Protocol] = msg match {
+        // If this manager is a follower, it will receive this message giving it a list of its peers.
         case LearnPeers(peers) =>
           this.peers = peers
           this
@@ -268,6 +326,7 @@ object RandomWorkers {
           runActions()
           this
 
+        // The benchmark ends after `config.totalQueries` queries have been answered.
         case QueryResponse(id) =>
           queryEndTimes(id) = System.nanoTime()
           queriesRemaining -= 1
@@ -275,17 +334,25 @@ object RandomWorkers {
             val queryTimes = Array.tabulate[Long](config.totalQueries) { i =>
               queryEndTimes(i) - queryStartTimes(i)
             }
-            benchmark ! OrchestratorDone(results = queryTimes.mkString("\n"), filename = config.queryTimesFile)
+            val lifeTimes = Manager.actorLifeTimes.toArray().map(_.asInstanceOf[Long])
+            benchmark ! OrchestratorDone()
+            if (!isWarmup) {
+              dumpMeasurements(queryTimes.mkString("\n"), config.queryTimesFile)
+              dumpMeasurements(lifeTimes.mkString("\n"), config.lifeTimesFile)
+            }
             done = true
-            //ctx.release(localWorkers)
-            //ctx.release(remoteWorkers)
             localWorkers.clear()
             remoteWorkers.clear()
           }
           this
 
+        // If this manager is the "lead" manager, it will get Ping messages at a fixed rate.
         case Ping =>
           runActions()
+          this
+
+        case TriggerGC =>
+          System.gc()
           this
       }
 
@@ -315,7 +382,7 @@ object RandomWorkers {
           val refs = acqs.map(acq => ctx.createRef(acq, owner))
           sendAcquaintMsg(owner, refs)
         }
-        if (rng.roll(config.managerProbRemoteAcquaint) && localWorkers.nonEmpty) {
+        if (rng.roll(config.managerProbRemoteAcquaint) && localWorkers.nonEmpty && remoteWorkers.nonEmpty) {
           val acqs = rng.select(remoteWorkers, config.maxAcqsInOneMsg).toSeq
           val owner = rng.select(localWorkers)
           val refs = acqs.map(acq => ctx.createRef(acq, owner))
@@ -337,8 +404,6 @@ object RandomWorkers {
         if (rng.roll(config.managerProbDeactivate)) {
           val locals = rng.selectDistinct(localWorkers, config.maxDeactivatedInOneTurn).toSeq
           val remotes = rng.selectDistinct(remoteWorkers, config.maxDeactivatedInOneTurn).toSeq
-          //ctx.release(locals)
-          //ctx.release(remotes)
           for (worker <- locals)
             remove(worker, localWorkers)
           for (worker <- remotes) {
@@ -347,8 +412,6 @@ object RandomWorkers {
         }
         if (rng.roll(config.managerProbDeactivateAll)
           || localWorkers.size + remoteWorkers.size > config.managerMaxAcquaintances) {
-          //ctx.release(localWorkers)
-          //ctx.release(remoteWorkers)
           localWorkers.clear()
           remoteWorkers.clear()
         }
