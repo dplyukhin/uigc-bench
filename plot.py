@@ -29,7 +29,7 @@ def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='Manual'):
     plt.show()
 
 if __name__ == "__main__":
-    file1_data = read_numbers_from_file("life-times-crgc.csv")
-    file2_data = read_numbers_from_file("life-times-mac.csv")
-    file3_data = read_numbers_from_file("life-times-manual.csv")
+    file1_data = read_numbers_from_file("life-times-crgc-f100.csv")
+    file2_data = read_numbers_from_file("life-times-mac-f100.csv")
+    file3_data = read_numbers_from_file("life-times-manual-f100.csv")
     plot_cdf(file1_data, file2_data, file3_data)

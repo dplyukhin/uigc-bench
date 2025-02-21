@@ -52,7 +52,7 @@ def run_local(reqs_per_second, output_dir, mode):
     # Add JFR options to SBT opts, saving the old value to be restored later.
     original_sbt_opts = os.environ.get("SBT_OPTS", "")
 
-    for jvm_gc_frequency in [100, 1000, 10000]:
+    for jvm_gc_frequency in [500, 1000]:
         for gc_type in ["crgc", "mac", "manual"]:
             with open(f'{output_dir}/{filename}.log', 'w') as log:
 
@@ -64,7 +64,7 @@ def run_local(reqs_per_second, output_dir, mode):
 
                 print(f"Starting orchestrator")
                 process = subprocess.Popen(
-                    ["sbt", "-J-Xms16G", "-J-Xmx16G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=1", f"-Duigc.engine={gc_type}",
+                    ["sbt", "-J-Xmx16G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=1", f"-Duigc.engine={gc_type}",
                         f"-Drandom-workers.life-times-file=life-times-{gc_type}-f{jvm_gc_frequency}.csv",
                         f"-Drandom-workers.jvm-gc-frequency={jvm_gc_frequency}",
                         f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
@@ -97,7 +97,7 @@ def run_benchmark(reqs_per_second, output_dir, mode):
 
             print(f"Starting {role}")
             process = subprocess.Popen(
-                ["sbt", "-Xms16G", "-J-Xmx16G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=3",
+                ["sbt", "-J-Xmx16G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=3",
                  f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
                 mode +
                 [f"runMain randomworkers.RandomWorkers {role} 0.0.0.0 0.0.0.0"],
