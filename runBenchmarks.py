@@ -64,7 +64,7 @@ def run_local(reqs_per_second, output_dir, mode):
 
                 print(f"Starting orchestrator")
                 process = subprocess.Popen(
-                    ["sbt", "-J-Xmx2G", "-Duigc.crgc.num-nodes=1", f"-Duigc.engine={gc_type}",
+                    ["sbt", "-J-Xmx16G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=1", f"-Duigc.engine={gc_type}",
                         f"-Drandom-workers.life-times-file=life-times-{gc_type}-f{jvm_gc_frequency}.csv",
                         f"-Drandom-workers.jvm-gc-frequency={jvm_gc_frequency}",
                         f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
@@ -97,7 +97,7 @@ def run_benchmark(reqs_per_second, output_dir, mode):
 
             print(f"Starting {role}")
             process = subprocess.Popen(
-                ["sbt", "-J-Xmx2G", "-Duigc.crgc.num-nodes=3",
+                ["sbt", "-J-Xmx16G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=3",
                  f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
                 mode +
                 [f"runMain randomworkers.RandomWorkers {role} 0.0.0.0 0.0.0.0"],
