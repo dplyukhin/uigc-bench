@@ -16,20 +16,20 @@ def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='Manual'):
     x2, cdf2 = compute_cdf(data2)
     x3, cdf3 = compute_cdf(data3)
     
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(4, 2))
     plt.plot(x1, cdf1, label=label1, marker='o', linestyle='-', alpha=0.7)
     plt.plot(x2, cdf2, label=label2, marker='s', linestyle='-', alpha=0.7)
     plt.plot(x3, cdf3, label=label3, marker='d', linestyle='-', alpha=0.7)
+
+    plt.xlim([0, 1500])
     
-    plt.xlabel('Value')
-    plt.ylabel('CDF')
-    plt.title('Cumulative Distribution Function (CDF)')
+    plt.xlabel('Actor life time (ms)')
     plt.legend()
     plt.grid(True)
     plt.show()
 
 if __name__ == "__main__":
-    file1_data = read_numbers_from_file("life-times-crgc-f100.csv")
-    file2_data = read_numbers_from_file("life-times-mac-f100.csv")
-    file3_data = read_numbers_from_file("life-times-manual-f100.csv")
+    file1_data = read_numbers_from_file("life-times-crgc-f1000.csv")
+    file2_data = read_numbers_from_file("life-times-mac-f1000.csv")
+    file3_data = read_numbers_from_file("life-times-manual-f1000.csv")
     plot_cdf(file1_data, file2_data, file3_data)
