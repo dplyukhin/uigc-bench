@@ -88,7 +88,6 @@ object RandomWorkers {
   private class Config() {
     private val config = ConfigFactory.load("random-workers")
     val acyclic = config.getBoolean("random-workers.acyclic")
-    println(s"Acyclic: $acyclic")
     val jvmGCFrequency = config.getInt("random-workers.jvm-gc-frequency")
     val reqsPerSecond = config.getInt("random-workers.reqs-per-second")
     val maxWorkSizeBytes = config.getInt("random-workers.max-work-size-in-bytes")
