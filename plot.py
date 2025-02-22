@@ -17,9 +17,10 @@ def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='Manual'):
     x3, cdf3 = compute_cdf(data3)
     
     plt.figure(figsize=(4, 2))
-    plt.plot(x1, cdf1, label=label1, marker='o', linestyle='-', alpha=0.7)
-    plt.plot(x2, cdf2, label=label2, marker='s', linestyle='-', alpha=0.7)
-    plt.plot(x3, cdf3, label=label3, marker='d', linestyle='-', alpha=0.7)
+    step = 10000
+    plt.plot(x1[::step], cdf1[::step], label=label1, marker='o', linestyle='-', alpha=0.7)
+    plt.plot(x2[::step], cdf2[::step], label=label2, marker='s', linestyle='-', alpha=0.7)
+    plt.plot(x3[::step], cdf3[::step], label=label3, marker='d', linestyle='-', alpha=0.7)
 
     plt.xlim([0, 1500])
     
@@ -29,7 +30,7 @@ def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='Manual'):
     plt.show()
 
 if __name__ == "__main__":
-    file1_data = read_numbers_from_file("life-times-crgc-f1000.csv")
-    file2_data = read_numbers_from_file("life-times-mac-f1000.csv")
-    file3_data = read_numbers_from_file("life-times-manual-f1000.csv")
+    file1_data = read_numbers_from_file("life-times-cyclic-crgc-f1000.csv")
+    file2_data = read_numbers_from_file("life-times-cyclic-mac-f1000.csv")
+    file3_data = read_numbers_from_file("life-times-cyclic-manual-f1000.csv")
     plot_cdf(file1_data, file2_data, file3_data)
