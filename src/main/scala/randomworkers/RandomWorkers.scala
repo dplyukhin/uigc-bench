@@ -87,6 +87,8 @@ object RandomWorkers {
 
   private class Config() {
     private val config = ConfigFactory.load("random-workers")
+    val acyclic = config.getBoolean("random-workers.acyclic")
+    println(s"Acyclic: $acyclic")
     val jvmGCFrequency = config.getInt("random-workers.jvm-gc-frequency")
     val reqsPerSecond = config.getInt("random-workers.reqs-per-second")
     val maxWorkSizeBytes = config.getInt("random-workers.max-work-size-in-bytes")
@@ -144,6 +146,10 @@ object RandomWorkers {
     }
   }
 
+  // In acyclic mode, we maintain the invariant that owners are always less than their targets.
+  def lessThan(owner: ActorRef[Protocol], target: ActorRef[Protocol]): Boolean = {
+    owner.path.toString < target.path.toString
+  }
 
   object Worker {
     def apply(config: Config): ActorFactory[Protocol] =
@@ -158,6 +164,13 @@ object RandomWorkers {
       private var state: List[Int] = List.tabulate(config.maxWorkSizeBytes / 4)(i => i)
       private val creationTime = System.nanoTime()
 
+      def acquaintancesForOwner(owner: ActorRef[Protocol]): mutable.ArrayBuffer[ActorRef[Protocol]] = {
+        if (config.acyclic)
+          acquaintances.filter(acq => lessThan(owner, acq))
+        else
+          acquaintances
+      }
+
       override def onSignal: PartialFunction[Signal,Behavior[Protocol]] = {
         case PostStop =>
           val killTime = System.nanoTime()
@@ -168,6 +181,12 @@ object RandomWorkers {
 
       override def onMessage(msg: Protocol): Behavior[Protocol] = msg match {
         case Acquaint(workers) =>
+          if (config.acyclic) {
+            for (worker <- workers) {
+              if (!lessThan(ctx.self, worker)) 
+                println("ERROR: Acyclic invariant violated in Worker.Acquaint")
+            }
+          }
           acquaintances.addAll(workers)
           this
 
@@ -178,8 +197,12 @@ object RandomWorkers {
         case Work(work) =>
           state = state.zip(work).map{case (a,b) => a + b}
           if (rng.roll(config.workerProbSpawn)) {
-            for (_ <- 1 to rng.randNat(config.maxSpawnsInOneTurn))
-              acquaintances.append(ctx.spawnAnonymous(Worker(config)))
+            for (_ <- 1 to rng.randNat(config.maxSpawnsInOneTurn)) {
+              val worker = ctx.spawnAnonymous(Worker(config))
+              if (!lessThan(ctx.self, worker)) 
+                println("ERROR: Acyclic invariant violated in Worker.spawn.")
+              acquaintances.append(worker)
+            }
           }
           if (rng.roll(config.workerProbSend) && acquaintances.nonEmpty) {
             val work = state
@@ -189,8 +212,8 @@ object RandomWorkers {
             }
           }
           if (rng.roll(config.workerProbAcquaint) && acquaintances.nonEmpty) {
-            val acqs = rng.select(acquaintances, config.maxAcqsInOneMsg).toSeq
             val owner = rng.select(acquaintances)
+            val acqs = rng.select(acquaintancesForOwner(owner), config.maxAcqsInOneMsg).toSeq
             val refs = acqs.map(acq => ctx.createRef(acq, owner))
             sendAcquaintMsg(owner, refs)
           }
@@ -315,6 +338,20 @@ object RandomWorkers {
         }
       }
 
+      def localWorkersForOwner(owner: ActorRef[Protocol]): mutable.ArrayBuffer[ActorRef[Protocol]] = {
+        if (config.acyclic)
+          localWorkers.filter(worker => lessThan(owner, worker))
+        else
+          localWorkers
+      }
+
+      def remoteWorkersForOwner(owner: ActorRef[Protocol]): mutable.ArrayBuffer[ActorRef[Protocol]] = {
+        if (config.acyclic)
+          remoteWorkers.filter(worker => lessThan(owner, worker))
+        else
+          remoteWorkers
+      }
+
       override def onMessage(msg: Protocol): Behavior[Protocol] = msg match {
         // If this manager is a follower, it will receive this message giving it a list of its peers.
         case LearnPeers(peers) =>
@@ -322,6 +359,12 @@ object RandomWorkers {
           this
 
         case Acquaint(workers) =>
+          if (config.acyclic) {
+            for (worker <- workers) {
+              if (!lessThan(ctx.self, worker)) 
+                println("ERROR: Acyclic invariant violated in Manager.Acquaint")
+            }
+          }
           remoteWorkers.addAll(workers)
           runActions()
           this
@@ -378,20 +421,20 @@ object RandomWorkers {
           }
         }
         if (rng.roll(config.managerProbLocalAcquaint) && localWorkers.nonEmpty) {
-          val acqs = rng.select(localWorkers, config.maxAcqsInOneMsg).toSeq
           val owner = rng.select(localWorkers)
+          val acqs = rng.select(localWorkersForOwner(owner), config.maxAcqsInOneMsg).toSeq
           val refs = acqs.map(acq => ctx.createRef(acq, owner))
           sendAcquaintMsg(owner, refs)
         }
         if (rng.roll(config.managerProbRemoteAcquaint) && localWorkers.nonEmpty && remoteWorkers.nonEmpty) {
-          val acqs = rng.select(remoteWorkers, config.maxAcqsInOneMsg).toSeq
           val owner = rng.select(localWorkers)
+          val acqs = rng.select(remoteWorkersForOwner(owner), config.maxAcqsInOneMsg).toSeq
           val refs = acqs.map(acq => ctx.createRef(acq, owner))
           sendAcquaintMsg(owner, refs)
         }
         if (rng.roll(config.managerProbPublishWorker) && peers.nonEmpty) {
-          val acqs = rng.select(localWorkers, config.maxAcqsInOneMsg).toSeq
           val peer = rng.select(peers)
+          val acqs = rng.select(localWorkersForOwner(peer), config.maxAcqsInOneMsg).toSeq
           val refs = acqs.map(acq => ctx.createRef(acq, peer))
           sendAcquaintMsg(peer, refs)
         }
