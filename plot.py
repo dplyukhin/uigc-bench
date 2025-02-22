@@ -11,7 +11,7 @@ def compute_cdf(data):
     cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
     return sorted_data, cdf
 
-def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='Manual'):
+def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='No GC'):
     x1, cdf1 = compute_cdf(data1)
     x2, cdf2 = compute_cdf(data2)
     x3, cdf3 = compute_cdf(data3)
@@ -33,4 +33,8 @@ if __name__ == "__main__":
     file1_data = read_numbers_from_file("life-times-cyclic-crgc-f1000.csv")
     file2_data = read_numbers_from_file("life-times-cyclic-mac-f1000.csv")
     file3_data = read_numbers_from_file("life-times-cyclic-manual-f1000.csv")
+    plot_cdf(file1_data, file2_data, file3_data)
+    file1_data = read_numbers_from_file("life-times-acyclic-crgc-f1000.csv")
+    file2_data = read_numbers_from_file("life-times-acyclic-mac-f1000.csv")
+    file3_data = read_numbers_from_file("life-times-acyclic-manual-f1000.csv")
     plot_cdf(file1_data, file2_data, file3_data)
