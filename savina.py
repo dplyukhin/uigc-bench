@@ -4,7 +4,6 @@ import argparse
 import subprocess
 import sys
 import os
-import matplotlib.pyplot as plt
 import numpy as np
 from time import time
 
@@ -18,10 +17,6 @@ quick_benchmarks = [
     "cigsmok.CigaretteSmokerAkkaActorBenchmark",
     "logmap.LogisticMapAkkaManualStashActorBenchmark",
 ]
-
-# Pyplot configuration.
-plt.style.use('tableau-colorblind10')
-plt.rcParams['figure.figsize'] = [6, 4]
 
 # Mappings from benchmarks to their names
 benchmarks = {
@@ -94,12 +89,6 @@ parallelBenchmarks = [
 
 def raw_time_filename(benchmark, gc_type):
     return f"raw_data/{benchmark}-{gc_type}.csv"
-
-def raw_times_exist():
-    for file in os.listdir('raw_data'):
-        if file.endswith('.csv'):
-            return True
-    return False
 
 def run_benchmark(benchmark, gc_type, options, args):
     classname = "edu.rice.habanero.benchmarks." + benchmark
@@ -229,10 +218,6 @@ class BenchmarkRunner:
         self.args = args
 
     def run_benchmarks(self):
-        if raw_times_exist():
-            print("There are already .csv files in the raw_data/ directory. Aborting.")
-            sys.exit()
-
         for i in range(self.args.invocations):
             for benchmark in self.benchmarks:
                 for gc_type in self.gc_types:
@@ -268,20 +253,25 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Create directories if they don't already exist.
-    os.makedirs('logs', exist_ok=True)
-    os.makedirs('raw_data', exist_ok=True)
-    os.makedirs('processed_data', exist_ok=True)
+
+    try:
+        os.makedirs('logs')
+        os.makedirs('raw_data')
+        os.makedirs('processed_data')
+    except FileExistsError:
+        print("Directories `logs`, `raw_data`, or `processed_data` already exist. Aborting.")
+        sys.exit(1)
 
     if args.command == "quick":
         bms = [bm for bm in quick_benchmarks]
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.run_benchmarks()
-        #runner.process_time_data()
+        runner.process_time_data()
     elif args.command == "full":
         bms = benchmarks.keys()
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.run_benchmarks()
-        #runner.process_time_data()
+        runner.process_time_data()
     else:
         parser.print_help()
 
