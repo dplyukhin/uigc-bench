@@ -9,6 +9,7 @@ target/
 project/
 *.jfr
 *.csv
+logs/
 
 raw_data/
 processed_data/
