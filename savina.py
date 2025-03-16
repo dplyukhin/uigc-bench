@@ -6,6 +6,7 @@ import sys
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+from time import time
 
 ############################## CONFIGURATION ##############################
 
@@ -118,7 +119,12 @@ def run_benchmark(benchmark, gc_type, options, args):
         print(f"Invalid garbage collector type '{gc_type}'. Valid options are: {gc_types}")
         sys.exit(1)
 
-    subprocess.run(["sbt", "-J-Xmx16G", "-J-XX:+UseZGC"] + gc_args + [f'runMain {classname} -iter {args.iter} {options}'])
+    with open(f'logs/{benchmark}-{gc_type}.log', 'a') as log:
+        print(f"Running {benchmark} with {gc_type} garbage collector...")
+        start_time = time()
+        subprocess.run(["sbt", "-J-Xmx16G", "-J-XX:+UseZGC"] + gc_args + [f'runMain {classname} -iter {args.iter} {options}'], stdout=log, stderr=log)
+        end_time = time()
+        print(f"Finished {args.iter} iterations in {end_time - start_time:.2f} seconds.")
 
 def run_time_benchmark(benchmark, gc_type, args):
     filename = raw_time_filename(benchmark, gc_type)
@@ -262,6 +268,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Create directories if they don't already exist.
+    os.makedirs('logs', exist_ok=True)
     os.makedirs('raw_data', exist_ok=True)
     os.makedirs('processed_data', exist_ok=True)
 
