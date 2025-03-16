@@ -1,6 +1,23 @@
-Savina
-======
+[Savina](https://github.com/shamsimam/savina) is an Actor Benchmark Suite, originally developed by Shams Imam and Vivek Sarkar at Rice University.
 
-[Savina](https://github.com/shamsimam/savina) is an Actor Benchmark Suite, originally developed by Shams Imam at Rice University.
+This repository is a fork of Savina. Benchmarks related to Akka have been ported to Pekko. Benchmarks related to other actor frameworks have been removed.
 
-This is a fork of Savina, used to evaluate the UIGC actor GC. Benchmarks related to Akka have been moved to Pekko/UIGC, and all other benchmarks have been removed.
+# Quick Start
+
+For a quick evaluation, run the script:
+
+```bash
+./savina.py quick
+```
+
+The full evaluation takes about a day to complete. Run it with the script:
+
+```bash
+./savina.py full
+```
+
+# Overview
+
+Benchmarks are located in `/src/main/scala/edu/rice/habanero/benchmarks`.
+
+Configuration files for each benchmark are located in `src/main/java/edu/rice/habanero/benchmarks`.

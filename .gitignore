@@ -1,5 +1,6 @@
 .idea/
 .metals/
+.bsp/
 .vscode/
 .bloop/
 venv/
