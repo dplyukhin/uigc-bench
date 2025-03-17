@@ -6,7 +6,7 @@ import sys
 import os
 import numpy as np
 import pandas as pd
-from time import time
+import time
 
 ############################## CONFIGURATION ##############################
 
@@ -54,7 +54,7 @@ quick_benchmarks = [
 ]
 
 # Mappings from benchmarks to their names
-benchmarks = {
+benchmark_names = {
     "apsp.ApspAkkaGCActorBenchmark": "All-Pairs Shortest Path",
     "astar.GuidedSearchAkkaGCActorBenchmark": "A-Star Search",
     "banking.BankingAkkaManualStashActorBenchmark": "Bank Transaction",
@@ -123,10 +123,11 @@ parallelBenchmarks = [
 
 ############################## BENCHMARK RUNNER ##############################
 
-def raw_time_filename(benchmark, gc_type):
-    return f"raw_data/{benchmark}-{gc_type}.csv"
+def raw_time_filename(benchmark, data_dir, gc_type):
+    return f"{data_dir}/raw/{benchmark}-{gc_type}.csv"
 
-def run_benchmark(benchmark, gc_type, options, args):
+def run_benchmark(benchmark, gc_type, data_dir, args):
+    filename = raw_time_filename(benchmark, data_dir, gc_type)
     classname = "edu.rice.habanero.benchmarks." + benchmark
 
     gc_args = []
@@ -134,8 +135,6 @@ def run_benchmark(benchmark, gc_type, options, args):
         gc_args = ["-Duigc.engine=manual"]
     elif gc_type == "wrc":
         gc_args = ["-Duigc.engine=mac", "-Duigc.mac.cycle-detection=off"]
-    elif gc_type == "mac":
-        gc_args = ["-Duigc.engine=mac", "-Duigc.mac.cycle-detection=on"]
     elif gc_type == "crgc-onblock":
         gc_args = ["-Duigc.crgc.collection-style=on-block", "-Duigc.engine=crgc"]
     elif gc_type == "crgc-wave":
@@ -144,57 +143,28 @@ def run_benchmark(benchmark, gc_type, options, args):
         print(f"Invalid garbage collector type '{gc_type}'. Valid options are: {gc_types}")
         sys.exit(1)
 
-    with open(f'logs/{benchmark}-{gc_type}.log', 'a') as log:
-        print(f"Running {benchmark} with {gc_type} garbage collector...")
-        start_time = time()
-        subprocess.run(["sbt", "-J-Xmx16G", "-J-XX:+UseZGC"] + gc_args + [f'runMain {classname} -iter {args.iter} {options}'], stdout=log, stderr=log)
-        end_time = time()
-        print(f"Finished {args.iter} iterations in {end_time - start_time:.2f} seconds.")
-
-def run_time_benchmark(benchmark, gc_type, args):
-    filename = raw_time_filename(benchmark, gc_type)
-    run_benchmark(benchmark, gc_type, f"-filename {filename}", args)
+    with open(f'{data_dir}/logs/{benchmark}-{gc_type}.log', 'a') as log:
+        print(f"Running {benchmark} with {gc_type} garbage collector...", end=" ", flush=True)
+        start_time = time.time()
+        subprocess.run(["sbt", "-J-Xmx16G", "-J-XX:+UseZGC"] + gc_args + [f'runMain {classname} -iter {args.iter} -filename {filename}'], stdout=log, stderr=log)
+        end_time = time.time()
+        print(f"Finished in {end_time - start_time:.2f} seconds.")
 
 
 ############################## DATA PROCESSING ##############################
 
-def processed_time_filename(benchmark):
-    return f"processed_data/{benchmark}.csv"
-
-def get_time_stats(benchmark, gc_type):
+def get_time_stats(benchmark, data_dir, gc_type):
     """
     Read the CSV file and return the average and standard deviation.
     """
-    filename = raw_time_filename(benchmark, gc_type)
+    filename = raw_time_filename(benchmark, data_dir, gc_type)
     with open(filename) as file:
         lines = [float(line) for line in file]
         # Only keep the 40% lowest values
         lines = sorted(lines)[:int(len(lines) * 0.4)]
+        if len(lines) == 0:
+            raise ValueError(f"Insufficient data in {filename}")
         return np.average(lines), np.std(lines)
-
-def process_time_data(benchmark):
-    d = []
-
-    nogc_avg, nogc_std = get_time_stats(benchmark, "nogc")
-    d.append(nogc_avg)
-    d.append(nogc_std)
-
-    wrc_avg, wrc_std = get_time_stats(benchmark, "wrc")
-    d.append(wrc_avg)
-    d.append(wrc_std)
-
-    onblk_avg, onblk_std = get_time_stats(benchmark, "crgc-onblock")
-    d.append(onblk_avg)
-    d.append(onblk_std)
-
-    wave_avg, wave_std = get_time_stats(benchmark, "crgc-wave")
-    d.append(wave_avg)
-    d.append(wave_std)
-
-    filename = processed_time_filename(benchmark)
-    with open(filename, "w") as output:
-        output.write('"no GC", "no GC error", "WRC", "WRC error", "CRGC (on-block)", "CRGC error (on-block)", "CRGC (wave)", "CRGC error (wave)"\n')
-        output.write(",".join([str(p) for p in d]) + "\n")
 
 def shorten_benchmark_name(benchmark):
     return benchmark.split(".")[0]
@@ -212,21 +182,21 @@ def cellcolor(stdev, overhead):
     else:
         return f"\\cellcolor{{red!{overhead / 200 * 60}}}{overhead}"
 
-def process_all_times(benchmark_list):
+def process_all_times(benchmark_list, data_dir):
     d = {}
     for bm in benchmark_list:
         d[bm] = ["\\texttt{" + shorten_benchmark_name(bm) + "}"]
 
-        nogc_avg, nogc_std = get_time_stats(bm, "nogc")
+        nogc_avg, nogc_std = get_time_stats(bm, data_dir, "nogc")
         d[bm].append(sigfigs(nogc_avg / 1000, 2))
 
-        wrc_avg, _ = get_time_stats(bm, "wrc")
+        wrc_avg, _ = get_time_stats(bm, data_dir, "wrc")
         d[bm].append(sigfigs(wrc_avg / 1000, 2))
 
-        onblk_avg, onblk_std = get_time_stats(bm, "crgc-onblock")
+        onblk_avg, onblk_std = get_time_stats(bm, data_dir, "crgc-onblock")
         d[bm].append(sigfigs(onblk_avg / 1000, 2))
 
-        wave_avg, wave_std = get_time_stats(bm, "crgc-wave")
+        wave_avg, wave_std = get_time_stats(bm, data_dir, "crgc-wave")
         d[bm].append(sigfigs(wave_avg / 1000, 2))
 
         percent_stdev = int(nogc_std / nogc_avg * 100)
@@ -244,52 +214,52 @@ def process_all_times(benchmark_list):
         for bm in parallelBenchmarks:
             output.write(" & ".join([str(p) for p in d[bm]]) + "\\\\\n")
 
-def display_data(benchmark_list):
-    frames = []
+def display_data(data_dir):
+    micro_df       = pd.DataFrame()
+    concurrency_df = pd.DataFrame()
+    parallel_df    = pd.DataFrame()
+    missing_data   = []
 
     # Add benchmark data to the dataframe
-    for bm in benchmark_list:
-        nogc_avg, nogc_std   = get_time_stats(bm, "nogc")
-        wrc_avg, _           = get_time_stats(bm, "wrc")
-        onblk_avg, onblk_std = get_time_stats(bm, "crgc-onblock")
-        wave_avg, wave_std   = get_time_stats(bm, "crgc-wave")
+    for bm in benchmark_names.keys():
+        try:
+            nogc_avg, nogc_std   = get_time_stats(bm, data_dir, "nogc")
+            wrc_avg, _           = get_time_stats(bm, data_dir, "wrc")
+            onblk_avg, onblk_std = get_time_stats(bm, data_dir, "crgc-onblock")
+            wave_avg, wave_std   = get_time_stats(bm, data_dir, "crgc-wave")
 
-        percent_stdev = int(nogc_std / nogc_avg * 100)
-        df = pd.DataFrame({
-            "Benchmark":      [shorten_benchmark_name(bm)],
-            "no GC":          [sigfigs(nogc_avg / 1000, 2)],
-            "WRC":            [sigfigs(wrc_avg / 1000, 2)],
-            "CRGC-block":     [sigfigs(onblk_avg / 1000, 2)],
-            "CRGC-wave":      [sigfigs(wave_avg / 1000, 2)],
-            "no GC (stdev)":  ["±" + str(percent_stdev)],
-            "WRC (%)":        [int((wrc_avg / nogc_avg - 1) * 100)],
-            "CRGC-block (%)": [int((onblk_avg / nogc_avg - 1) * 100)],
-            "CRGC-wave (%)":  [int((wave_avg / nogc_avg - 1) * 100)],
-        })
-        frames.append(df)
-    df = pd.concat(frames, ignore_index=True)
-    print(df.to_markdown(tablefmt="rounded_grid", index=False, headers=df.columns))
+            percent_stdev = int(nogc_std / nogc_avg * 100)
+            df = pd.DataFrame({
+                "Benchmark":      [shorten_benchmark_name(bm)],
+                "no GC":          [sigfigs(nogc_avg / 1000, 2)],
+                "WRC":            [sigfigs(wrc_avg / 1000, 2)],
+                "CRGC-block":     [sigfigs(onblk_avg / 1000, 2)],
+                "CRGC-wave":      [sigfigs(wave_avg / 1000, 2)],
+                "no GC (stdev)":  ["±" + str(percent_stdev)],
+                "WRC (%)":        [int((wrc_avg / nogc_avg - 1) * 100)],
+                "CRGC-block (%)": [int((onblk_avg / nogc_avg - 1) * 100)],
+                "CRGC-wave (%)":  [int((wave_avg / nogc_avg - 1) * 100)],
+            })
+            if bm in microBenchmarks:
+                micro_df = pd.concat([micro_df, df], ignore_index=True)
+            elif bm in concurrentBenchmarks:
+                concurrency_df = pd.concat([concurrency_df, df], ignore_index=True)
+            elif bm in parallelBenchmarks:
+                parallel_df = pd.concat([parallel_df, df], ignore_index=True)
+        except:
+            missing_data.append(bm)
+            continue
 
-############################## RUNNER ##############################
+    if len(missing_data) > 0:
+        missing_data = ", ".join([shorten_benchmark_name(bm) for bm in missing_data])
+        print(f"Missing data for the following benchmarks: {missing_data}")
 
-class BenchmarkRunner:
-
-    def __init__(self, benchmarks, gc_types, args):
-        self.benchmarks = benchmarks
-        self.gc_types = gc_types
-        self.args = args
-
-    def run_benchmarks(self):
-        for i in range(self.args.invocations):
-            for benchmark in self.benchmarks:
-                for gc_type in self.gc_types:
-                    run_time_benchmark(benchmark, gc_type, self.args)
-
-    def process_time_data(self):
-        for bm in self.benchmarks:
-            process_time_data(bm)
-        process_all_times(self.benchmarks)
-        display_data(self.benchmarks)
+    print("Microbenchmarks:")
+    print(micro_df.to_markdown(tablefmt="rounded_grid", index=False, headers=df.columns))
+    print("\nConcurrency benchmarks:")
+    print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False, headers=df.columns))
+    print("\nParallel benchmarks:")
+    print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False, headers=df.columns))
 
 
 ############################## MAIN ##############################
@@ -315,33 +285,67 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    os.makedirs('data', exist_ok=True)
 
     if args.command in ["quick", "full"]:
+        # Current time in the form YYYY-MM-DD-HH-MM-SS
+        timestamp = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+        data_dir = f"data/{timestamp}"
+
         # Create directories if they don't already exist.
         try:
-            os.makedirs('logs')
-            os.makedirs('raw_data')
-            os.makedirs('processed_data')
+            os.makedirs(f'{data_dir}')
+            os.makedirs(f'{data_dir}/logs')
+            os.makedirs(f'{data_dir}/raw')
         except FileExistsError:
-            print("Directories `logs`, `raw_data`, or `processed_data` already exist. Aborting.")
+            print(f"Directory `{data_dir}` already exists. Aborting.")
             sys.exit(1)
 
         # Set the benchmarks
-        bms = []
+        benchmarks = []
         if args.command == "quick":
-            bms = [bm for bm in quick_benchmarks]
+            benchmarks = quick_benchmarks
         elif args.command == "full":
-            bms = benchmarks.keys()
+            benchmarks = benchmark_names.keys()
 
         # Run the benchmarks
-        runner = BenchmarkRunner(bms, gc_types, args)
-        runner.run_benchmarks()
-        runner.process_time_data()
+        for i in range(args.invocations):
+            for benchmark in benchmarks:
+                for gc_type in gc_types:
+                    run_benchmark(benchmark, gc_type, data_dir, args)
 
     elif args.command == "process":
-        bms = benchmarks.keys()
-        runner = BenchmarkRunner(bms, gc_types, args)
-        runner.process_time_data()
+        # Get a list of directories in the data folder
+        directories = [d for d in os.listdir("data") if os.path.isdir(f"data/{d}")]
+        directories.sort()
+        if len(directories) == 0:
+            print("No data found in the `data/` directory.")
+            sys.exit(1)
+
+        # Choose a directory to look at
+        data_dir = None
+        if len(directories) == 1:
+            data_dir = f"data/{directories[0]}"
+        else:
+            # Ask the user to pick a directory
+            print("Multiple runs found in the `data/` directory. Please choose one:")
+            for i, d in enumerate(directories):
+                print(f"[{i}] {d}")
+            while True:
+                choice = input("Choose a run, or press Enter for the most recent run: ")
+                if choice == "":
+                    data_dir = f"data/{directories[-1]}"
+                    break
+                try:
+                    choice = int(choice)
+                    if choice not in range(len(directories)):
+                        raise ValueError
+                    data_dir = f"data/{directories[choice]}"
+                    break
+                except ValueError:
+                    print("Invalid choice. Please enter a number or press Enter.")
+
+        display_data(data_dir)
 
     else:
         parser.print_help()
