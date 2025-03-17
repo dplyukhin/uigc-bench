@@ -3,8 +3,8 @@
 import argparse
 import subprocess
 import sys
-import os
 import numpy as np
+import pandas as pd
 from time import time
 
 ############################## CONFIGURATION ##############################
@@ -12,10 +12,44 @@ from time import time
 # Types of garbage collectors to use
 gc_types = ["nogc", "wrc", "crgc-onblock", "crgc-wave"]
 
-# Benchmarks to run in the "quick" evaluation
+# Benchmarks to run in the "quick" evaluation.
+# Benchmarks that take more than a second to run on average are commented out.
 quick_benchmarks = [
+    #### Microbenchmarks
+
+    #"big.BigAkkaActorBenchmark",
+    #"chameneos.ChameneosAkkaActorBenchmark",
+    #"count.CountingAkkaGCActorBenchmark",
+    "fib.FibonacciAkkaGCActorBenchmark",
+    #"fjcreate.ForkJoinAkkaActorBenchmark",
+    "fjthrput.ThroughputAkkaActorBenchmark",
+    #"pingpong.PingPongAkkaActorBenchmark",
+    "threadring.ThreadRingAkkaActorBenchmark",
+
+    ### Concurrent benchmarks
+
+    "banking.BankingAkkaManualStashActorBenchmark",
+    "bndbuffer.ProdConsAkkaActorBenchmark",
     "cigsmok.CigaretteSmokerAkkaActorBenchmark",
+    "concdict.DictionaryAkkaActorBenchmark",
+    #"concsll.SortedListAkkaActorBenchmark",
     "logmap.LogisticMapAkkaManualStashActorBenchmark",
+    #"philosopher.PhilosopherAkkaActorBenchmark",
+
+    ### Parallel benchmarks
+
+    "apsp.ApspAkkaGCActorBenchmark",
+    #"astar.GuidedSearchAkkaGCActorBenchmark",
+    "bitonicsort.BitonicSortAkkaActorBenchmark",
+    "facloc.FacilityLocationAkkaActorBenchmark",
+    "nqueenk.NQueensAkkaGCActorBenchmark",
+    "piprecision.PiPrecisionAkkaActorBenchmark",
+    "quicksort.QuickSortAkkaGCActorBenchmark",
+    #"radixsort.RadixSortAkkaGCActorBenchmark",
+    "recmatmul.MatMulAkkaGCActorBenchmark",
+    "sieve.SieveAkkaActorBenchmark",
+    "trapezoid.TrapezoidalAkkaActorBenchmark",
+    "uct.UctAkkaActorBenchmark",
 ]
 
 # Mappings from benchmarks to their names
@@ -59,6 +93,7 @@ microBenchmarks = [
     "fjcreate.ForkJoinAkkaActorBenchmark",
     "fjthrput.ThroughputAkkaActorBenchmark",
     "pingpong.PingPongAkkaActorBenchmark",
+    "threadring.ThreadRingAkkaActorBenchmark",
 ]
 concurrentBenchmarks = [
     "banking.BankingAkkaManualStashActorBenchmark",
@@ -208,6 +243,32 @@ def process_all_times(benchmark_list):
         for bm in parallelBenchmarks:
             output.write(" & ".join([str(p) for p in d[bm]]) + "\\\\\n")
 
+def display_data(benchmark_list):
+    frames = []
+
+    # Add benchmark data to the dataframe
+    for bm in benchmark_list:
+        nogc_avg, nogc_std   = get_time_stats(bm, "nogc")
+        wrc_avg, _           = get_time_stats(bm, "wrc")
+        onblk_avg, onblk_std = get_time_stats(bm, "crgc-onblock")
+        wave_avg, wave_std   = get_time_stats(bm, "crgc-wave")
+
+        percent_stdev = int(nogc_std / nogc_avg * 100)
+        df = pd.DataFrame({
+            "Benchmark":      [shorten_benchmark_name(bm)],
+            "no GC":          [sigfigs(nogc_avg / 1000, 2)],
+            "WRC":            [sigfigs(wrc_avg / 1000, 2)],
+            "CRGC-block":     [sigfigs(onblk_avg / 1000, 2)],
+            "CRGC-wave":      [sigfigs(wave_avg / 1000, 2)],
+            "no GC (stdev)":  ["±" + str(percent_stdev)],
+            "WRC (%)":        [int((wrc_avg / nogc_avg - 1) * 100)],
+            "CRGC-block (%)": [int((onblk_avg / nogc_avg - 1) * 100)],
+            "CRGC-wave (%)":  [int((wave_avg / nogc_avg - 1) * 100)],
+        })
+        frames.append(df)
+    df = pd.concat(frames, ignore_index=True)
+    print(df.to_markdown(tablefmt="rounded_grid", index=False, headers=df.columns))
+
 ############################## RUNNER ##############################
 
 class BenchmarkRunner:
@@ -227,6 +288,7 @@ class BenchmarkRunner:
         for bm in self.benchmarks:
             process_time_data(bm)
         process_all_times(self.benchmarks)
+        display_data(self.benchmarks)
 
 
 ############################## MAIN ##############################
@@ -235,7 +297,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=["quick", "full"],
+        choices=["quick", "full", "process"],
         help="Which command to run."
     )
     parser.add_argument(
@@ -254,13 +316,13 @@ if __name__ == "__main__":
 
     # Create directories if they don't already exist.
 
-    try:
-        os.makedirs('logs')
-        os.makedirs('raw_data')
-        os.makedirs('processed_data')
-    except FileExistsError:
-        print("Directories `logs`, `raw_data`, or `processed_data` already exist. Aborting.")
-        sys.exit(1)
+    #try:
+    #    os.makedirs('logs')
+    #    os.makedirs('raw_data')
+    #    os.makedirs('processed_data')
+    #except FileExistsError:
+    #    print("Directories `logs`, `raw_data`, or `processed_data` already exist. Aborting.")
+    #    sys.exit(1)
 
     if args.command == "quick":
         bms = [bm for bm in quick_benchmarks]
@@ -271,6 +333,10 @@ if __name__ == "__main__":
         bms = benchmarks.keys()
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.run_benchmarks()
+        runner.process_time_data()
+    elif args.command == "process":
+        bms = benchmarks.keys()
+        runner = BenchmarkRunner(bms, gc_types, args)
         runner.process_time_data()
     else:
         parser.print_help()

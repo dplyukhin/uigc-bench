@@ -4,7 +4,7 @@ This repository is a fork of Savina. Benchmarks related to Akka have been ported
 
 # Quick Start
 
-You must have `python3` and `numpy` installed. For a quick evaluation, run the script:
+You must have `python3` with `numpy`, `pandas`, and `tabulate` installed. For a quick evaluation, run the script:
 
 ```bash
 ./savina.py quick
