@@ -3,6 +3,7 @@
 import argparse
 import subprocess
 import sys
+import os
 import numpy as np
 import pandas as pd
 from time import time
@@ -314,30 +315,34 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Create directories if they don't already exist.
 
-    #try:
-    #    os.makedirs('logs')
-    #    os.makedirs('raw_data')
-    #    os.makedirs('processed_data')
-    #except FileExistsError:
-    #    print("Directories `logs`, `raw_data`, or `processed_data` already exist. Aborting.")
-    #    sys.exit(1)
+    if args.command in ["quick", "full"]:
+        # Create directories if they don't already exist.
+        try:
+            os.makedirs('logs')
+            os.makedirs('raw_data')
+            os.makedirs('processed_data')
+        except FileExistsError:
+            print("Directories `logs`, `raw_data`, or `processed_data` already exist. Aborting.")
+            sys.exit(1)
 
-    if args.command == "quick":
-        bms = [bm for bm in quick_benchmarks]
+        # Set the benchmarks
+        bms = []
+        if args.command == "quick":
+            bms = [bm for bm in quick_benchmarks]
+        elif args.command == "full":
+            bms = benchmarks.keys()
+
+        # Run the benchmarks
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.run_benchmarks()
         runner.process_time_data()
-    elif args.command == "full":
-        bms = benchmarks.keys()
-        runner = BenchmarkRunner(bms, gc_types, args)
-        runner.run_benchmarks()
-        runner.process_time_data()
+
     elif args.command == "process":
         bms = benchmarks.keys()
         runner = BenchmarkRunner(bms, gc_types, args)
         runner.process_time_data()
+
     else:
         parser.print_help()
 
