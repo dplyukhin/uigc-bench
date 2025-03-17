@@ -86,6 +86,11 @@ public class BenchmarkRunner {
 
                 System.out.printf(execTimeOutputFormat, benchmark.name(), " Iteration-" + i, execTimeMillis);
                 benchmark.cleanupIteration(i + 1 == iterations, execTimeMillis);
+                try {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e) {
+                }
             }
 
             // End JFR Recording
