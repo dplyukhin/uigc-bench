@@ -86,13 +86,6 @@ public class BenchmarkRunner {
 
                 System.out.printf(execTimeOutputFormat, benchmark.name(), " Iteration-" + i, execTimeMillis);
                 benchmark.cleanupIteration(i + 1 == iterations, execTimeMillis);
-                // Added by Dan: Trigger a gc cycle and sleep.
-                System.gc();
-                try {
-                    Thread.sleep(3000);
-                }
-                catch (InterruptedException e) {
-                }
             }
 
             // End JFR Recording
