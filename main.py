@@ -140,19 +140,6 @@ def get_gc_args(gc_type, num_nodes=1):
         print(f"Invalid garbage collector type '{gc_type}'. Valid options are: {gc_types}")
         sys.exit(1)
 
-def get_mode_args(mode):
-    d = None
-    if mode == "torture-small":
-        d = torture_small
-    elif mode == "torture-large":
-        d = torture_large
-    elif mode == "streaming":
-        d = streaming_mode
-    else:
-        print(f"Invalid random workers mode '{mode}'. Valid options are: {workers_modes}")
-        sys.exit(1)
-    return [f"-D{key}={value}" for key, value in d.items()]
-
 ##################################################
 #                     SAVINA                     #
 ##################################################
@@ -201,7 +188,18 @@ class WorkersRunInfo:
         return get_gc_args(self.gc_type, self.num_nodes)
 
     def workers_args(self):
-        return get_mode_args(self.mode) + [
+        d = None
+        if self.mode == "torture-small":
+            d = torture_small
+        elif self.mode == "torture-large":
+            d = torture_large
+        elif self.mode == "streaming":
+            d = streaming_mode
+        else:
+            print(f"Invalid random workers mode '{self.mode}'. Valid options are: {workers_modes}")
+            sys.exit(1)
+
+        return [f"-D{key}={value}" for key, value in d.items()] + [
             f"-Drandom-workers.life-times-file={self.lifetimes()}",
             f"-Drandom-workers.query-times-file={self.queries()}",
             f"-Drandom-workers.reqs-per-second={self.rps}",
@@ -210,6 +208,9 @@ class WorkersRunInfo:
 
 def workers_run_local(info):
     with open(info.log("orchestrator"), 'w') as log:
+        print(f"Running RandomWorkers in {info.mode} mode with {info.gc_type}...", end=" ", flush=True)
+        start_time = time.time()
+
         process = subprocess.Popen(
             ["sbt"] +
             workers_jvm_args +
@@ -220,6 +221,9 @@ def workers_run_local(info):
         )
         # Wait for the orchestrator to terminate
         process.wait()
+
+        end_time = time.time()
+        print(f"Finished in {end_time - start_time:.2f} seconds.")
 
 def workers_run_cluster(info):
     # Add JFR options to SBT opts, saving the old value to be restored later.
@@ -234,6 +238,9 @@ def workers_run_cluster(info):
             "manager1": log2,
             "manager2": log3,
         }
+
+        print(f"Running RandomWorkers in {info.mode} mode with {info.gc_type}...", end=" ", flush=True)
+        start_time = time.time()
 
         processes = []
         for role in ["orchestrator", "manager1", "manager2"]:
@@ -254,6 +261,9 @@ def workers_run_cluster(info):
         # Wait for all processes to terminate
         for process in processes:
             process.wait()
+
+        end_time = time.time()
+        print(f"Finished in {end_time - start_time:.2f} seconds.")
 
     # Restore the original SBT_OPTS for the next iteration
     os.environ["SBT_OPTS"] = original_sbt_opts
@@ -283,8 +293,15 @@ def short_name(benchmark):
 
 def sigfigs(x, n):
     """Round x to n significant figures."""
+    if np.isnan(x):
+        return x
     y = round(x, n - int(np.floor(np.log10(abs(x)))) - 1)
     return int(y) if y.is_integer() else y
+
+def to_int(x):
+    if np.isnan(x):
+        return x
+    return int(x)
 
 def savina_display_data(data_dir):
     micro_df       = pd.DataFrame()
@@ -300,7 +317,7 @@ def savina_display_data(data_dir):
             onblk_avg, onblk_std = get_time_stats(bm, data_dir, "crgc-onblock")
             wave_avg, wave_std   = get_time_stats(bm, data_dir, "crgc-wave")
 
-            percent_stdev = int(nogc_std / nogc_avg * 100)
+            percent_stdev = to_int(nogc_std / nogc_avg * 100)
             df = pd.DataFrame({
                 "Benchmark":        [short_name(bm)],
                 "no GC":            [sigfigs(nogc_avg / 1000, 2)],
@@ -308,9 +325,9 @@ def savina_display_data(data_dir):
                 "CRGC-block":       [sigfigs(onblk_avg / 1000, 2)],
                 "CRGC-wave":        [sigfigs(wave_avg / 1000, 2)],
                 "no GC (stdev %)":  ["±" + str(percent_stdev)],
-                "WRC (%)":          [int((wrc_avg / nogc_avg - 1) * 100)],
-                "CRGC-block (%)":   [int((onblk_avg / nogc_avg - 1) * 100)],
-                "CRGC-wave (%)":    [int((wave_avg / nogc_avg - 1) * 100)],
+                "WRC (%)":          [to_int((wrc_avg / nogc_avg - 1) * 100)],
+                "CRGC-block (%)":   [to_int((onblk_avg / nogc_avg - 1) * 100)],
+                "CRGC-wave (%)":    [to_int((wave_avg / nogc_avg - 1) * 100)],
             })
             if bm in savina_microbenchmarks:
                 micro_df = pd.concat([micro_df, df], ignore_index=True)
@@ -322,12 +339,18 @@ def savina_display_data(data_dir):
             missing_data.append(bm)
             continue
 
-    print("Microbenchmarks:")
-    print(micro_df.to_markdown(tablefmt="rounded_grid", index=False))
-    print("\nConcurrency benchmarks:")
-    print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False))
-    print("\nParallel benchmarks:")
-    print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False))
+    if not micro_df.empty:
+        print("Microbenchmarks:")
+        print(micro_df.to_markdown(tablefmt="rounded_grid", index=False))
+        print()
+    if not concurrency_df.empty:
+        print("Concurrency benchmarks:")
+        print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False))
+        print()
+    if not parallel_df.empty:
+        print("Parallel benchmarks:")
+        print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False))
+        print()
 
 ##################################################
 #                     WORKERS                    #
