@@ -1,6 +1,6 @@
 package randomworkers
 
-import common.ClusterBenchmark
+import common.{ClusterBenchmark, ClusterProtocol, OrchestratorReady}
 import org.apache.pekko.actor.typed
 import org.apache.pekko.uigc.actor.typed.{RemoteSpawner, unmanaged}
 
@@ -17,12 +17,12 @@ object SpawnPoint {
    * @param isWarmup Whether this is a warmup run.
    */
   def leader(
-              benchmark: unmanaged.ActorRef[ClusterBenchmark.Protocol[RemoteSpawner.Command[Protocol]]],
+              benchmark: unmanaged.ActorRef[ClusterProtocol[RemoteSpawner.Command[Protocol]]],
               workerNodes: Map[String, unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
               isWarmup: Boolean
   ): unmanaged.Behavior[RemoteSpawner.Command[Protocol]] =
     typed.scaladsl.Behaviors.setup[RemoteSpawner.Command[Protocol]] { ctx =>
-      benchmark ! ClusterBenchmark.OrchestratorReady()
+      benchmark ! OrchestratorReady()
 
       // Spawn the manager actor.
       ctx.spawn(Manager.leadManager(benchmark, workerNodes.values, isWarmup), "manager0")
