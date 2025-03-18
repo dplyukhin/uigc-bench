@@ -6,6 +6,7 @@ import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.uigc.actor.typed.RemoteSpawner
 import randomworkers.{Protocol, SpawnPoint}
 
+/** A meta-level orchestrator that spawns the lead [[randomworkers.Manager]] in each iteration. */
 object Orchestrator {
   val OrchestratorServiceKey: ServiceKey[MetaProtocol] = ServiceKey[MetaProtocol]("ClusterBench")
 
@@ -45,7 +46,7 @@ object Orchestrator {
 
   /** After the orchestrator node learned the names of the worker actors, it spawned an orchestrator
     * actor. Here the orch node waits for the orch actor to prepare for a new iteration of the
-    * benchmark. Once [[OrchestratorReady]] is received, the node starts a timer.
+    * benchmark. Once [[OrchestratorReady]] is received, the [[BenchmarkRunner]] starts a timer.
     */
   private def waitForOrchestrator(
       workerNodes: Map[String, ActorRef[MetaProtocol]],
@@ -59,8 +60,7 @@ object Orchestrator {
       }
     }
 
-  /** The orchestrator waits to receive [[OrchestratorDone]] and decides whether to do another
-    * iteration.
+  /** The orchestrator waits to receive [[OrchestratorDone]] and signals completion to the workers.
     */
   private def waitForIterationCompletion(
       workerNodes: Map[String, ActorRef[MetaProtocol]],

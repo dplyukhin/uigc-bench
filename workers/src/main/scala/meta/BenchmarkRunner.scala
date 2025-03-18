@@ -13,15 +13,15 @@ object BenchmarkRunner {
   def main(args: Array[String]): Unit =
     if (args.length != 4) {
       println(
-        s"Invalid arguments. Expected 4 args: {role} {hostname} {leader hostname} {number of nodes}.\nGot ${args
+        s"Invalid arguments. Expected 4 args: {number of nodes} {role} {hostname} {leader hostname}.\nGot ${args
             .mkString("Array(", ", ", ")")}."
       )
       System.exit(1)
     } else {
-      val role       = args(0)
-      val hostname   = args(1)
-      val leaderhost = args(2)
-      val numNodes   = args(3).toInt
+      val numNodes   = args(0).toInt
+      val role       = args(1)
+      val hostname   = args(2)
+      val leaderhost = args(3)
 
       if (role == "orchestrator") startup(role, 25251, hostname, leaderhost, numNodes)
       else startup(role, 0, hostname, leaderhost, numNodes)

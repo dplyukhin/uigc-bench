@@ -9,6 +9,7 @@ import randomworkers.{Protocol, SpawnPoint}
 
 import java.util.concurrent.CountDownLatch
 
+/** A meta-level worker actor that spawns the worker [[randomworkers.Manager]] in each iteration. */
 private object Worker {
   def apply(
       info: IterationInfo

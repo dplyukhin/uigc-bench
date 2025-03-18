@@ -183,35 +183,43 @@ def workers_run_local(reqs_per_second, output_dir, mode):
                  f"-Drandom-workers.life-times-file=life-times-{gc_type}.csv",
                  f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
                 mode_to_args(mode) +
-                [f"runMain randomworkers.RandomWorkers orchestrator 0.0.0.0 0.0.0.0"],
+                [f"runMain randomworkers.RandomWorkers 1 orchestrator 0.0.0.0 0.0.0.0"],
                 stdout=log
             )
             # Wait for the orchestrator to terminate
             process.wait()
 
-def workers_run_cluster(reqs_per_second, output_dir, mode):
+def workers_run_cluster(reqs_per_second, data_dir, mode):
     filename = f"workers-rps-{reqs_per_second}"
 
     # Add JFR options to SBT opts, saving the old value to be restored later.
     original_sbt_opts = os.environ.get("SBT_OPTS", "")
 
-    with open(f'{output_dir}/{filename}.log', 'w') as log:
+    with open(f'{data_dir}/logs/{filename}-orchestrator.log', 'w') as log1, \
+         open(f'{data_dir}/logs/{filename}-manager1.log', 'w') as log2, \
+         open(f'{data_dir}/logs/{filename}-manager2.log', 'w') as log3:
+
+        logs = {
+            "orchestrator": log1,
+            "manager1": log2,
+            "manager2": log3,
+        }
 
         processes = []
         for role in ["orchestrator", "manager1", "manager2"]:
-            jfr_file = f"{output_dir}/{filename}-{role}.jfr"
+            jfr_file = f"{data_dir}/raw/{filename}-{role}.jfr"
             jfr_settings = 'profile.jfc'
 
             os.environ["SBT_OPTS"] = original_sbt_opts + \
                  f" -XX:StartFlightRecording=filename={jfr_file},settings={jfr_settings},dumponexit=true"
 
-            print(f"Starting {role}")
             process = subprocess.Popen(
-                ["sbt", "-J-Xmx2G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=3",
+                ["sbt", "-J-Xmx2G", "-J-XX:+UseZGC", "-Duigc.engine=crgc", "-Duigc.crgc.num-nodes=3",
                  f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
                 mode_to_args(mode) +
-                [f"runMain randomworkers.RandomWorkers {role} 0.0.0.0 0.0.0.0"],
-                stdout=log
+                [f"workers/run 3 {role} 0.0.0.0 0.0.0.0"],
+                stdout=logs[role],
+                stderr=logs[role]
             )
             processes.append(process)
             time.sleep(5)
@@ -393,10 +401,11 @@ if __name__ == "__main__":
 
         # Run the benchmarks
         start_time = time.time()
-        for i in range(args.invocations):
-            for benchmark in savina_benchmarks:
-                for gc_type in gc_types:
-                    savina_run_benchmark(benchmark, gc_type, data_dir, args)
+        #for i in range(args.invocations):
+        #    for benchmark in savina_benchmarks:
+        #        for gc_type in gc_types:
+        #            savina_run_benchmark(benchmark, gc_type, data_dir, args)
+        workers_run_cluster(200, data_dir, default_mode)
         end_time = time.time()
         print(f"Finished everything in {(end_time - start_time)/60:.2f} minutes.")
 
