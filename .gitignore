@@ -3,14 +3,10 @@
 .bsp/
 .vscode/
 .bloop/
+.DS_Store/
 venv/
-.DS_Store
 target/
 project/
 *.jfr
 *.csv
-logs/
-
-raw_data/
-processed_data/
-figures/
+data/

@@ -14,7 +14,7 @@ You also need Java 17+ and at least 8 GB of memory available.
 The "quick" evaluation takes about 30 minutes. Here's how to run it:
 
 ```bash
-./savina.py quick
+./main.py quick
 ```
 
 The "quick" evaluation only runs a subset of the Savina benchmarks. Each 
@@ -28,7 +28,7 @@ written to the `data/` directory.
 To display the results as an ASCII table, run the following command.
 
 ```bash
-./savina.py view
+./main.py view
 ```
 
 If you ran the evaluation multiple times, the command lets you choose which 
@@ -41,7 +41,7 @@ iterations across 6 JVM invocations and takes about 10 hours.
 Run it with the following command:
 
 ```bash
-./savina.py full
+./main.py full
 ```
 
 You can customize the number of iterations and JVM invocations with the
@@ -49,9 +49,11 @@ You can customize the number of iterations and JVM invocations with the
 
 # Project Overview
 
-Benchmarks are located in `/src/main/scala/edu/rice/habanero/benchmarks`. Each
+## Savina
+
+Benchmarks are located in `savina/src/main/scala/edu/rice/habanero/benchmarks`. Each
 benchmark from the original Savina repository has been ported to use the 
 Pekko/UIGC API.
 
 Configuration files for each benchmark are located in 
-`src/main/java/edu/rice/habanero/benchmarks`.
+`savina/src/main/java/edu/rice/habanero/benchmarks`.
