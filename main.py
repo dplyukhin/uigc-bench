@@ -8,19 +8,23 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
+import json
 
 ################################################################################
 #                                CONFIGURATION                                 #
 ################################################################################
+
+# PyPlot style
+plt.style.use('tableau-colorblind10')
+
+# Which types of garbage collectors to use
+gc_types = ["nogc", "wrc", "crgc-onblock", "crgc-wave"]
 
 ##################################################
 #                     SAVINA                     #
 ##################################################
 
 savina_jvm_args = ["-J-Xmx8G", "-J-XX:+UseZGC"]
-
-# Which types of garbage collectors to use
-gc_types = ["nogc", "wrc", "crgc-onblock", "crgc-wave"]
 
 # List of Savina benchmarks to run in the "quick" evaluation.
 # Benchmarks that take more than a second to run are excluded.
@@ -177,6 +181,9 @@ class WorkersRunInfo:
 
     def jfr(self, role):
         return f'{self.data_dir}/raw/workers-{self.rps}-{self.mode}-{self.gc_type}-{role}.jfr'
+
+    def json(self, role):
+        return f'{self.data_dir}/raw/workers-{self.rps}-{self.mode}-{self.gc_type}-{role}.json'
 
     def lifetimes(self):
         return f'{self.data_dir}/raw/workers-{self.rps}-{self.mode}-{self.gc_type}-lifetimes.csv'
@@ -340,21 +347,63 @@ def savina_display_data(data_dir):
             continue
 
     if not micro_df.empty:
-        print("Microbenchmarks:")
+        print("\nMicrobenchmarks:")
         print(micro_df.to_markdown(tablefmt="rounded_grid", index=False))
-        print()
     if not concurrency_df.empty:
-        print("Concurrency benchmarks:")
+        print("\nConcurrency benchmarks:")
         print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False))
-        print()
     if not parallel_df.empty:
-        print("Parallel benchmarks:")
+        print("\nParallel benchmarks:")
         print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False))
-        print()
 
 ##################################################
 #                     WORKERS                    #
 ##################################################
+
+def workers_read_jfr(info):
+    jfr_file = info.jfr("orchestrator")
+    json_file = info.json("orchestrator")
+    subprocess.run(f"jfr print --categories 'UIGC' --json {jfr_file} > {json_file}", shell=True)
+    total_app_data = 0
+    total_compression_data = 0
+    total_shadow_data = 0
+    total_ingress_data = 0
+    with open(json_file, 'r') as f:
+        data = json.load(f)
+        events = data['recording']['events']
+        for event in events:
+            if "IngressEntrySerialization" in event['type']:
+                total_ingress_data += event['values']['size']
+            elif "DeltaGraphSerialization" in event['type']:
+                total_compression_data += event['values']['compressionTableSize']
+                total_shadow_data += event['values']['shadowSize']
+            elif "AppMsgSerialization" in event['type']:
+                total_app_data += event['values']['size']
+
+    return {
+        "total_app_data": total_app_data,
+        "total_compression_data": total_compression_data,
+        "total_shadow_data": total_shadow_data,
+        "total_ingress_data": total_ingress_data
+    }
+
+def workers_process_data(info):
+    print(f'App data size, Compression data size, Shadow data size, Ingress data size\n')
+
+    total_app_data = 0
+    total_compression_data = 0
+    total_shadow_data = 0
+    total_ingress_data = 0
+
+    for role in ["orchestrator", "manager1", "manager2"]:
+        role_results = workers_read_jfr(info)
+
+        total_app_data += role_results["total_app_data"]
+        total_compression_data += role_results["total_compression_data"]
+        total_shadow_data += role_results["total_shadow_data"]
+        total_ingress_data += role_results["total_ingress_data"]
+
+    print(f'{total_app_data}, {total_compression_data}, {total_shadow_data}, {total_ingress_data}\n')
 
 def workers_get_data(filename):
     with open(filename, 'r') as f:
@@ -500,6 +549,13 @@ if __name__ == "__main__":
                     print("Invalid choice. Please enter a number or press Enter.")
 
         savina_display_data(data_dir)
+        for mode in workers_modes:
+            for rps in [200]:
+                for gc_type in ["crgc-onblock"]:
+                    info = WorkersRunInfo(
+                        rps=rps, data_dir=data_dir, mode=mode, gc_type=gc_type, num_nodes=3, iterations=1
+                    )
+                    workers_process_data(info)
 
     else:
         parser.print_help()
