@@ -6,87 +6,49 @@ import sys
 import os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import time
 
-############################## CONFIGURATION ##############################
+################################################################################
+#                                CONFIGURATION                                 #
+################################################################################
 
-# Types of garbage collectors to use
+##################################################
+#                     SAVINA                     #
+##################################################
+
+# Which types of garbage collectors to use
 gc_types = ["nogc", "wrc", "crgc-onblock", "crgc-wave"]
 
-# Benchmarks to run in the "quick" evaluation.
-# Benchmarks that take more than a second to run on average are commented out.
-quick_benchmarks = [
+# List of Savina benchmarks to run in the "quick" evaluation.
+# Benchmarks that take more than a second to run are excluded.
+savina_quick_benchmarks = [
     #### Microbenchmarks
-
-    #"big.BigAkkaActorBenchmark",
-    #"chameneos.ChameneosAkkaActorBenchmark",
-    #"count.CountingAkkaGCActorBenchmark",
     "fib.FibonacciAkkaGCActorBenchmark",
-    #"fjcreate.ForkJoinAkkaActorBenchmark",
     "fjthrput.ThroughputAkkaActorBenchmark",
-    #"pingpong.PingPongAkkaActorBenchmark",
     "threadring.ThreadRingAkkaActorBenchmark",
 
     ### Concurrent benchmarks
-
     "banking.BankingAkkaManualStashActorBenchmark",
     "bndbuffer.ProdConsAkkaActorBenchmark",
     "cigsmok.CigaretteSmokerAkkaActorBenchmark",
     "concdict.DictionaryAkkaActorBenchmark",
-    #"concsll.SortedListAkkaActorBenchmark",
     "logmap.LogisticMapAkkaManualStashActorBenchmark",
-    #"philosopher.PhilosopherAkkaActorBenchmark",
 
     ### Parallel benchmarks
-
     "apsp.ApspAkkaGCActorBenchmark",
-    #"astar.GuidedSearchAkkaGCActorBenchmark",
     "bitonicsort.BitonicSortAkkaActorBenchmark",
     "facloc.FacilityLocationAkkaActorBenchmark",
     "nqueenk.NQueensAkkaGCActorBenchmark",
     "piprecision.PiPrecisionAkkaActorBenchmark",
     "quicksort.QuickSortAkkaGCActorBenchmark",
-    #"radixsort.RadixSortAkkaGCActorBenchmark",
     "recmatmul.MatMulAkkaGCActorBenchmark",
     "sieve.SieveAkkaActorBenchmark",
     "trapezoid.TrapezoidalAkkaActorBenchmark",
     "uct.UctAkkaActorBenchmark",
 ]
 
-# Mappings from benchmarks to their names
-benchmark_names = {
-    "apsp.ApspAkkaGCActorBenchmark": "All-Pairs Shortest Path",
-    "astar.GuidedSearchAkkaGCActorBenchmark": "A-Star Search",
-    "banking.BankingAkkaManualStashActorBenchmark": "Bank Transaction",
-    #"barber.SleepingBarberAkkaActorBenchmark": "Sleeping Barber",              # Skipped due to unstable performance
-    "big.BigAkkaActorBenchmark": "Big",
-    "bitonicsort.BitonicSortAkkaActorBenchmark": "Bitonic Sort",
-    "bndbuffer.ProdConsAkkaActorBenchmark": "Producer-Consumer",
-    "chameneos.ChameneosAkkaActorBenchmark": "Chameneos",
-    "cigsmok.CigaretteSmokerAkkaActorBenchmark": "Cigarette Smokers",
-    "concdict.DictionaryAkkaActorBenchmark": "Concurrent Dictionary",
-    "concsll.SortedListAkkaActorBenchmark": "Concurrent Sorted Linked List",
-    "count.CountingAkkaGCActorBenchmark": "Counting Actor",
-    "facloc.FacilityLocationAkkaActorBenchmark": "Online Facility Location",
-    "fib.FibonacciAkkaGCActorBenchmark": "Recursive Fibonacci Tree",
-    #"filterbank.FilterBankAkkaActorBenchmark": "Filter Bank",                 # Skipped due to deadlocks
-    "fjcreate.ForkJoinAkkaActorBenchmark": "Fork Join (Actor Creation)",
-    "fjthrput.ThroughputAkkaActorBenchmark": "Fork Join (Throughput)",
-    "logmap.LogisticMapAkkaManualStashActorBenchmark": "Logistic Map Series",
-    "nqueenk.NQueensAkkaGCActorBenchmark": "N-Queens",
-    "philosopher.PhilosopherAkkaActorBenchmark": "Dining Philosophers",
-    "pingpong.PingPongAkkaActorBenchmark": "Ping Pong",
-    "piprecision.PiPrecisionAkkaActorBenchmark": "Precise Pi Calculation",
-    "quicksort.QuickSortAkkaGCActorBenchmark": "Recursive Tree Quicksort",
-    "radixsort.RadixSortAkkaGCActorBenchmark": "Radix Sort",
-    "recmatmul.MatMulAkkaGCActorBenchmark": "Recursive Matrix Multiplication",
-    "sieve.SieveAkkaActorBenchmark": "Sieve of Eratosthenes",
-    #"sor.SucOverRelaxAkkaActorBenchmark": "Successive Over-Relaxation",       # Skipped due to deadlocks
-    "threadring.ThreadRingAkkaActorBenchmark": "Thread Ring",
-    "trapezoid.TrapezoidalAkkaActorBenchmark": "Trapezoidal Approximation",
-    "uct.UctAkkaActorBenchmark": "Unbalanced Cobwebbed Tree",
-}
-microBenchmarks = [
+savina_microbenchmarks = [
     "big.BigAkkaActorBenchmark",
     "chameneos.ChameneosAkkaActorBenchmark",
     "count.CountingAkkaGCActorBenchmark",
@@ -96,8 +58,10 @@ microBenchmarks = [
     "pingpong.PingPongAkkaActorBenchmark",
     "threadring.ThreadRingAkkaActorBenchmark",
 ]
-concurrentBenchmarks = [
+
+savina_concurrent_benchmarks = [
     "banking.BankingAkkaManualStashActorBenchmark",
+    #"barber.SleepingBarberAkkaActorBenchmark",            # Skipped due to unstable performance
     "bndbuffer.ProdConsAkkaActorBenchmark",
     "cigsmok.CigaretteSmokerAkkaActorBenchmark",
     "concdict.DictionaryAkkaActorBenchmark",
@@ -105,28 +69,80 @@ concurrentBenchmarks = [
     "logmap.LogisticMapAkkaManualStashActorBenchmark",
     "philosopher.PhilosopherAkkaActorBenchmark",
 ]
-parallelBenchmarks = [
+
+savina_parallel_benchmarks = [
     "apsp.ApspAkkaGCActorBenchmark",
     "astar.GuidedSearchAkkaGCActorBenchmark",
     "bitonicsort.BitonicSortAkkaActorBenchmark",
     "facloc.FacilityLocationAkkaActorBenchmark",
+    #"filterbank.FilterBankAkkaActorBenchmark",            # Skipped due to deadlocks
     "nqueenk.NQueensAkkaGCActorBenchmark",
     "piprecision.PiPrecisionAkkaActorBenchmark",
     "quicksort.QuickSortAkkaGCActorBenchmark",
     "radixsort.RadixSortAkkaGCActorBenchmark",
     "recmatmul.MatMulAkkaGCActorBenchmark",
     "sieve.SieveAkkaActorBenchmark",
+    #"sor.SucOverRelaxAkkaActorBenchmark",                 # Skipped due to deadlocks
     "trapezoid.TrapezoidalAkkaActorBenchmark",
     "uct.UctAkkaActorBenchmark",
 ]
 
+# List of all Savina benchmarks
+savina_all_benchmarks = savina_microbenchmarks + savina_concurrent_benchmarks + savina_parallel_benchmarks
 
-############################## BENCHMARK RUNNER ##############################
+
+##################################################
+#                     WORKERS                    #
+##################################################
+
+default_mode = {
+}
+
+big_data_mode = {
+    "random-workers.max-work-size-in-bytes": 5120
+}
+
+streaming_mode = {
+    **big_data_mode,
+    "random-workers.wrk-probabilities.spawn": 0,
+    "random-workers.wrk-probabilities.acquaint": 0,
+    "random-workers.mgr-probabilities.spawn": 0.01,
+    "random-workers.mgr-probabilities.local-acquaint": 0,
+    "random-workers.mgr-probabilities.publish-worker": 1,
+    "random-workers.mgr-probabilities.deactivate": 0,
+    "random-workers.total-queries": 20000,
+}
+
+acyclic_mode = {
+    "random-workers.total-queries": 500,
+    "random-workers.max-acqs-per-msg": 0,
+    "random-workers.mgr-probabilities.local-acquaint": 0,
+    "random-workers.wrk-probabilities.acquaint": 0,
+}
+
+local_acyclic_mode = {
+    **acyclic_mode,
+    "random-workers.acyclic": "true",
+}
+
+local_cyclic_mode = {
+    **acyclic_mode,
+    "random-workers.acyclic": "false",
+}
+
+
+################################################################################
+#                                   RUNNER                                     #
+################################################################################
+
+##################################################
+#                     SAVINA                     #
+##################################################
 
 def raw_time_filename(benchmark, data_dir, gc_type):
     return f"{data_dir}/raw/{benchmark}-{gc_type}.csv"
 
-def run_benchmark(benchmark, gc_type, data_dir, args):
+def savina_run_benchmark(benchmark, gc_type, data_dir, args):
     filename = raw_time_filename(benchmark, data_dir, gc_type)
     classname = "edu.rice.habanero.benchmarks." + benchmark
 
@@ -144,14 +160,73 @@ def run_benchmark(benchmark, gc_type, data_dir, args):
         sys.exit(1)
 
     with open(f'{data_dir}/logs/{benchmark}-{gc_type}.log', 'a') as log:
-        print(f"Running {shorten_benchmark_name(benchmark)} with {gc_type}...", end=" ", flush=True)
+        print(f"Running {short_name(benchmark)} with {gc_type}...", end=" ", flush=True)
         start_time = time.time()
-        subprocess.run(["sbt", "-J-Xmx8G", "-J-XX:+UseZGC"] + gc_args + [f'savina/runMain {classname} -iter {args.iter} -filename {filename}'], stdout=log, stderr=log)
+        subprocess.run(["sbt", "-J-Xmx8G", "-J-XX:+UseZGC"] + gc_args + [f'savina/runMain {classname} -iter {args.iterations} -filename {filename}'], stdout=log, stderr=log)
         end_time = time.time()
         print(f"Finished in {end_time - start_time:.2f} seconds.")
 
+##################################################
+#                     WORKERS                    #
+##################################################
 
-############################## DATA PROCESSING ##############################
+def mode_to_args(mode):
+    """Converts a mode into a list of arguments to be passed to the JVM."""
+    return [f"-D{key}={value}" for key, value in mode.items()]
+
+def workers_run_local(reqs_per_second, output_dir, mode):
+    for gc_type in ["crgc", "mac", "manual"]:
+        filename = f"workers-rps{reqs_per_second}-{gc_type}"
+        with open(f'{output_dir}/{filename}.log', 'w') as log:
+            process = subprocess.Popen(
+                ["sbt", "-J-Xmx2G", "-J-XX:+UseZGC", f"-Duigc.engine={gc_type}", "-Duigc.crgc.num-nodes=1",
+                 f"-Drandom-workers.life-times-file=life-times-{gc_type}.csv",
+                 f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
+                mode_to_args(mode) +
+                [f"runMain randomworkers.RandomWorkers orchestrator 0.0.0.0 0.0.0.0"],
+                stdout=log
+            )
+            # Wait for the orchestrator to terminate
+            process.wait()
+
+def workers_run_cluster(reqs_per_second, output_dir, mode):
+    filename = f"workers-rps-{reqs_per_second}"
+
+    # Add JFR options to SBT opts, saving the old value to be restored later.
+    original_sbt_opts = os.environ.get("SBT_OPTS", "")
+
+    with open(f'{output_dir}/{filename}.log', 'w') as log:
+
+        processes = []
+        for role in ["orchestrator", "manager1", "manager2"]:
+            jfr_file = f"{output_dir}/{filename}-{role}.jfr"
+            jfr_settings = 'profile.jfc'
+
+            os.environ["SBT_OPTS"] = original_sbt_opts + \
+                                     f" -XX:StartFlightRecording=filename={jfr_file},settings={jfr_settings},dumponexit=true"
+
+            print(f"Starting {role}")
+            process = subprocess.Popen(
+                ["sbt", "-J-Xmx2G", "-J-XX:+UseZGC", "-Duigc.crgc.num-nodes=3",
+                 f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
+                mode_to_args(mode) +
+                [f"runMain randomworkers.RandomWorkers {role} 0.0.0.0 0.0.0.0"],
+                stdout=log
+            )
+            processes.append(process)
+            time.sleep(5)
+
+        # Wait for all processes to terminate
+        for process in processes:
+            process.wait()
+
+    # Restore the original SBT_OPTS for the next iteration
+    os.environ["SBT_OPTS"] = original_sbt_opts
+
+
+################################################################################
+#                                 PROCESSING                                   #
+################################################################################
 
 def get_time_stats(benchmark, data_dir, gc_type):
     """
@@ -166,7 +241,11 @@ def get_time_stats(benchmark, data_dir, gc_type):
             raise ValueError(f"Insufficient data in {filename}")
         return np.average(lines), np.std(lines)
 
-def shorten_benchmark_name(benchmark):
+##################################################
+#                     SAVINA                     #
+##################################################
+
+def short_name(benchmark):
     return benchmark.split(".")[0]
 
 def sigfigs(x, n):
@@ -176,52 +255,14 @@ def sigfigs(x, n):
     y = round(x, n - int(np.floor(np.log10(abs(x)))) - 1)
     return int(y) if y.is_integer() else y
 
-def cellcolor(stdev, overhead):
-    if overhead < 0:
-        return f"\\cellcolor{{green!{abs(overhead) / 200 * 60}}}{overhead}"
-    else:
-        return f"\\cellcolor{{red!{overhead / 200 * 60}}}{overhead}"
-
-def process_all_times(benchmark_list, data_dir):
-    d = {}
-    for bm in benchmark_list:
-        d[bm] = ["\\texttt{" + shorten_benchmark_name(bm) + "}"]
-
-        nogc_avg, nogc_std = get_time_stats(bm, data_dir, "nogc")
-        d[bm].append(sigfigs(nogc_avg / 1000, 2))
-
-        wrc_avg, _ = get_time_stats(bm, data_dir, "wrc")
-        d[bm].append(sigfigs(wrc_avg / 1000, 2))
-
-        onblk_avg, onblk_std = get_time_stats(bm, data_dir, "crgc-onblock")
-        d[bm].append(sigfigs(onblk_avg / 1000, 2))
-
-        wave_avg, wave_std = get_time_stats(bm, data_dir, "crgc-wave")
-        d[bm].append(sigfigs(wave_avg / 1000, 2))
-
-        percent_stdev = int(nogc_std / nogc_avg * 100)
-        d[bm].append("±" + str(percent_stdev))
-        d[bm].append(cellcolor(percent_stdev, int((wrc_avg / nogc_avg - 1) * 100)))
-        d[bm].append(cellcolor(percent_stdev, int((onblk_avg / nogc_avg - 1) * 100)))
-        d[bm].append(cellcolor(percent_stdev, int((wave_avg / nogc_avg - 1) * 100)))
-
-    with open("processed_data/savina.tex", "w") as output:
-        output.write('Benchmark, no GC, WRC, CRGC-block, CRGC-wave, no GC (stdev), WRC, CRGC-block, CRGC-wave"\n')
-        for bm in microBenchmarks:
-            output.write(" & ".join([str(p) for p in d[bm]]) + "\\\\\n")
-        for bm in concurrentBenchmarks:
-            output.write(" & ".join([str(p) for p in d[bm]]) + "\\\\\n")
-        for bm in parallelBenchmarks:
-            output.write(" & ".join([str(p) for p in d[bm]]) + "\\\\\n")
-
-def display_data(data_dir):
+def savina_display_data(data_dir):
     micro_df       = pd.DataFrame()
     concurrency_df = pd.DataFrame()
     parallel_df    = pd.DataFrame()
     missing_data   = []
 
     # Add benchmark data to the dataframe
-    for bm in benchmark_names.keys():
+    for bm in savina_all_benchmarks:
         try:
             nogc_avg, nogc_std   = get_time_stats(bm, data_dir, "nogc")
             wrc_avg, _           = get_time_stats(bm, data_dir, "wrc")
@@ -230,7 +271,7 @@ def display_data(data_dir):
 
             percent_stdev = int(nogc_std / nogc_avg * 100)
             df = pd.DataFrame({
-                "Benchmark":        [shorten_benchmark_name(bm)],
+                "Benchmark":        [short_name(bm)],
                 "no GC":            [sigfigs(nogc_avg / 1000, 2)],
                 "WRC":              [sigfigs(wrc_avg / 1000, 2)],
                 "CRGC-block":       [sigfigs(onblk_avg / 1000, 2)],
@@ -240,19 +281,15 @@ def display_data(data_dir):
                 "CRGC-block (%)":   [int((onblk_avg / nogc_avg - 1) * 100)],
                 "CRGC-wave (%)":    [int((wave_avg / nogc_avg - 1) * 100)],
             })
-            if bm in microBenchmarks:
+            if bm in savina_microbenchmarks:
                 micro_df = pd.concat([micro_df, df], ignore_index=True)
-            elif bm in concurrentBenchmarks:
+            elif bm in savina_concurrent_benchmarks:
                 concurrency_df = pd.concat([concurrency_df, df], ignore_index=True)
-            elif bm in parallelBenchmarks:
+            elif bm in savina_parallel_benchmarks:
                 parallel_df = pd.concat([parallel_df, df], ignore_index=True)
         except:
             missing_data.append(bm)
             continue
-
-    if len(missing_data) > 0:
-        missing_data = ", ".join([shorten_benchmark_name(bm) for bm in missing_data])
-        print(f"Missing data for the following benchmarks: {missing_data}")
 
     print("Microbenchmarks:")
     print(micro_df.to_markdown(tablefmt="rounded_grid", index=False))
@@ -260,6 +297,48 @@ def display_data(data_dir):
     print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False))
     print("\nParallel benchmarks:")
     print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False))
+
+##################################################
+#                     WORKERS                    #
+##################################################
+
+def read_numbers_from_file(filename):
+    with open(filename, 'r') as f:
+        numbers = [float(line.strip()) for line in f if line.strip()]
+    return numbers
+
+def compute_cdf(data):
+    sorted_data = np.sort(data)
+    cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+    return sorted_data, cdf
+
+def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='No GC'):
+    x1, cdf1 = compute_cdf(data1)
+    x2, cdf2 = compute_cdf(data2)
+    x3, cdf3 = compute_cdf(data3)
+
+    plt.figure(figsize=(4, 2))
+    step = 10000
+    plt.plot(x1[::step], cdf1[::step], label=label1, marker='o', linestyle='-', alpha=0.7)
+    plt.plot(x2[::step], cdf2[::step], label=label2, marker='s', linestyle='-', alpha=0.7)
+    plt.plot(x3[::step], cdf3[::step], label=label3, marker='d', linestyle='-', alpha=0.7)
+
+    plt.xlim([0, 1500])
+
+    plt.xlabel('Actor life time (ms)')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def plot():
+    file1_data = read_numbers_from_file("life-times-cyclic-crgc.csv")
+    file2_data = read_numbers_from_file("life-times-cyclic-mac.csv")
+    file3_data = read_numbers_from_file("life-times-cyclic-manual.csv")
+    plot_cdf(file1_data, file2_data, file3_data)
+    file1_data = read_numbers_from_file("life-times-acyclic-crgc.csv")
+    file2_data = read_numbers_from_file("life-times-acyclic-mac.csv")
+    file3_data = read_numbers_from_file("life-times-acyclic-manual.csv")
+    plot_cdf(file1_data, file2_data, file3_data)
 
 
 ############################## MAIN ##############################
@@ -272,7 +351,7 @@ if __name__ == "__main__":
         help="Which command to run."
     )
     parser.add_argument(
-        "--iter",
+        "--iterations",
         type=int,
         default=None,
         help="Number of times to run each benchmark PER JVM INVOCATION."
@@ -304,15 +383,15 @@ if __name__ == "__main__":
         # Set the benchmarks
         benchmarks = []
         if args.command == "quick":
-            benchmarks = quick_benchmarks
-            if args.iter is None:
-                args.iter = 10
+            benchmarks = savina_quick_benchmarks
+            if args.iterations is None:
+                args.iterations = 10
             if args.invocations is None:
                 args.invocations = 1
         elif args.command == "full":
-            benchmarks = benchmark_names.keys()
-            if args.iter is None:
-                args.iter = 20
+            benchmarks = savina_all_benchmarks
+            if args.iterations is None:
+                args.iterations = 20
             if args.invocations is None:
                 args.invocations = 6
 
@@ -321,7 +400,7 @@ if __name__ == "__main__":
         for i in range(args.invocations):
             for benchmark in benchmarks:
                 for gc_type in gc_types:
-                    run_benchmark(benchmark, gc_type, data_dir, args)
+                    savina_run_benchmark(benchmark, gc_type, data_dir, args)
         end_time = time.time()
         print(f"Finished everything in {(end_time - start_time)/60:.2f} minutes.")
 
@@ -358,7 +437,7 @@ if __name__ == "__main__":
                 except ValueError:
                     print("Invalid choice. Please enter a number or press Enter.")
 
-        display_data(data_dir)
+        savina_display_data(data_dir)
 
     else:
         parser.print_help()

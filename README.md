@@ -20,7 +20,7 @@ The "quick" evaluation takes about 30 minutes. Here's how to run it:
 The "quick" evaluation only runs a subset of the Savina benchmarks. Each 
 benchmark only runs for ten iterations and just one JVM invocation. You 
 can customize the number of iterations and JVM invocations with the 
-`--iter` and `--invocations` flags, respectively. The raw data will be 
+`--iterations` and `--invocations` flags, respectively. The raw data will be 
 written to the `data/` directory.
 
 ## Viewing Results
@@ -45,7 +45,7 @@ Run it with the following command:
 ```
 
 You can customize the number of iterations and JVM invocations with the
-`--iter` and `--invocations` flags, respectively.
+`--iterations` and `--invocations` flags, respectively.
 
 # Project Overview
 
