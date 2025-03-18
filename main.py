@@ -360,50 +360,69 @@ def savina_display_data(data_dir):
 #                     WORKERS                    #
 ##################################################
 
-def workers_read_jfr(info):
-    jfr_file = info.jfr("orchestrator")
-    json_file = info.json("orchestrator")
-    subprocess.run(f"jfr print --categories 'UIGC' --json {jfr_file} > {json_file}", shell=True)
-    total_app_data = 0
-    total_compression_data = 0
-    total_shadow_data = 0
-    total_ingress_data = 0
-    with open(json_file, 'r') as f:
-        data = json.load(f)
-        events = data['recording']['events']
-        for event in events:
-            if "IngressEntrySerialization" in event['type']:
-                total_ingress_data += event['values']['size']
-            elif "DeltaGraphSerialization" in event['type']:
-                total_compression_data += event['values']['compressionTableSize']
-                total_shadow_data += event['values']['shadowSize']
-            elif "AppMsgSerialization" in event['type']:
-                total_app_data += event['values']['size']
-
-    return {
-        "total_app_data": total_app_data,
-        "total_compression_data": total_compression_data,
-        "total_shadow_data": total_shadow_data,
-        "total_ingress_data": total_ingress_data
-    }
+def bytes_to_str(n):
+    if n < 1024:
+        return f"{n} B"
+    n /= 1024
+    if n < 1024:
+        return f"{n:.2f} KB"
+    n /= 1024
+    if n < 1024:
+        return f"{n:.2f} MB"
+    n /= 1024
+    return f"{n:.2f} GB"
 
 def workers_process_data(info):
-    print(f'App data size, Compression data size, Shadow data size, Ingress data size\n')
-
-    total_app_data = 0
-    total_compression_data = 0
-    total_shadow_data = 0
-    total_ingress_data = 0
+    app = 0
+    refs = 0
+    shadows = 0
+    ingress = 0
 
     for role in ["orchestrator", "manager1", "manager2"]:
-        role_results = workers_read_jfr(info)
+        jfr_file = info.jfr(role)
+        json_file = info.json(role)
+        subprocess.run(f"jfr print --categories 'UIGC' --json {jfr_file} > {json_file}", shell=True)
 
-        total_app_data += role_results["total_app_data"]
-        total_compression_data += role_results["total_compression_data"]
-        total_shadow_data += role_results["total_shadow_data"]
-        total_ingress_data += role_results["total_ingress_data"]
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+            events = data['recording']['events']
+            for event in events:
+                if "IngressEntrySerialization" in event['type']:
+                    ingress += event['values']['size']
+                elif "DeltaGraphSerialization" in event['type']:
+                    refs += event['values']['compressionTableSize']
+                    shadows += event['values']['shadowSize']
+                elif "AppMsgSerialization" in event['type']:
+                    app += event['values']['size']
 
-    print(f'{total_app_data}, {total_compression_data}, {total_shadow_data}, {total_ingress_data}\n')
+        os.remove(json_file)
+
+    df = pd.DataFrame({
+        "Mode":             [info.mode],
+        "Application data": [bytes_to_str(app)],
+        "Actor references": [bytes_to_str(refs)],
+        "Shadows":          [bytes_to_str(shadows)],
+        "Ingress entries":  [bytes_to_str(ingress)],
+    })
+    return df
+
+def workers_display_data(data_dir):
+    frames = []
+    for mode in workers_modes:
+        for rps in [200]:
+            for gc_type in ["crgc-onblock"]:
+                info = WorkersRunInfo(
+                    rps=rps, data_dir=data_dir, mode=mode, gc_type=gc_type, num_nodes=3, iterations=1
+                )
+                frame = workers_process_data(info)
+                frames.append(frame)
+
+    df = pd.concat(frames, ignore_index=True)
+
+    if not df.empty:
+        print("\nRandom Workers Bandwidth:")
+        print(df.to_markdown(tablefmt="rounded_grid", index=False))
+
 
 def workers_get_data(filename):
     with open(filename, 'r') as f:
@@ -549,13 +568,7 @@ if __name__ == "__main__":
                     print("Invalid choice. Please enter a number or press Enter.")
 
         savina_display_data(data_dir)
-        for mode in workers_modes:
-            for rps in [200]:
-                for gc_type in ["crgc-onblock"]:
-                    info = WorkersRunInfo(
-                        rps=rps, data_dir=data_dir, mode=mode, gc_type=gc_type, num_nodes=3, iterations=1
-                    )
-                    workers_process_data(info)
+        workers_display_data(data_dir)
 
     else:
         parser.print_help()
