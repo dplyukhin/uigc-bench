@@ -17,6 +17,8 @@ import time
 #                     SAVINA                     #
 ##################################################
 
+savina_jvm_args = ["-J-Xmx8G", "-J-XX:+UseZGC"]
+
 # Which types of garbage collectors to use
 gc_types = ["nogc", "wrc", "crgc-onblock", "crgc-wave"]
 
@@ -95,45 +97,61 @@ savina_all_benchmarks = savina_microbenchmarks + savina_concurrent_benchmarks + 
 #                     WORKERS                    #
 ##################################################
 
-default_mode = {
+workers_jvm_args = ["-J-Xmx2G", "-J-XX:+UseZGC"]
+
+workers_modes = ["torture-small", "torture-large", "streaming"]
+
+torture_small = {
 }
 
-big_data_mode = {
+torture_large = {
     "random-workers.max-work-size-in-bytes": 5120
 }
 
 streaming_mode = {
-    **big_data_mode,
+    "random-workers.max-work-size-in-bytes": 5120,
     "random-workers.wrk-probabilities.spawn": 0,
     "random-workers.wrk-probabilities.acquaint": 0,
     "random-workers.mgr-probabilities.spawn": 0.01,
     "random-workers.mgr-probabilities.local-acquaint": 0,
     "random-workers.mgr-probabilities.publish-worker": 1,
     "random-workers.mgr-probabilities.deactivate": 0,
-    "random-workers.total-queries": 20000,
 }
 
 acyclic_mode = {
-    "random-workers.total-queries": 500,
-    "random-workers.max-acqs-per-msg": 0,
-    "random-workers.mgr-probabilities.local-acquaint": 0,
-    "random-workers.wrk-probabilities.acquaint": 0,
-}
-
-local_acyclic_mode = {
-    **acyclic_mode,
     "random-workers.acyclic": "true",
-}
-
-local_cyclic_mode = {
-    **acyclic_mode,
-    "random-workers.acyclic": "false",
 }
 
 
 ################################################################################
 #                                   RUNNER                                     #
 ################################################################################
+
+def get_gc_args(gc_type, num_nodes=1):
+    if gc_type == "nogc":
+        return ["-Duigc.engine=manual"]
+    elif gc_type == "wrc":
+        return ["-Duigc.engine=mac", "-Duigc.mac.cycle-detection=off"]
+    elif gc_type == "crgc-onblock":
+        return ["-Duigc.engine=crgc", f"-Duigc.crgc.num-nodes={num_nodes}", "-Duigc.crgc.collection-style=on-block"]
+    elif gc_type == "crgc-wave":
+        return ["-Duigc.engine=crgc", f"-Duigc.crgc.num-nodes={num_nodes}", "-Duigc.crgc.collection-style=wave"]
+    else:
+        print(f"Invalid garbage collector type '{gc_type}'. Valid options are: {gc_types}")
+        sys.exit(1)
+
+def get_mode_args(mode):
+    d = None
+    if mode == "torture-small":
+        d = torture_small
+    elif mode == "torture-large":
+        d = torture_large
+    elif mode == "streaming":
+        d = streaming_mode
+    else:
+        print(f"Invalid random workers mode '{mode}'. Valid options are: {workers_modes}")
+        sys.exit(1)
+    return [f"-D{key}={value}" for key, value in d.items()]
 
 ##################################################
 #                     SAVINA                     #
@@ -145,24 +163,12 @@ def raw_time_filename(benchmark, data_dir, gc_type):
 def savina_run_benchmark(benchmark, gc_type, data_dir, args):
     filename = raw_time_filename(benchmark, data_dir, gc_type)
     classname = "edu.rice.habanero.benchmarks." + benchmark
-
-    gc_args = []
-    if gc_type == "nogc":
-        gc_args = ["-Duigc.engine=manual"]
-    elif gc_type == "wrc":
-        gc_args = ["-Duigc.engine=mac", "-Duigc.mac.cycle-detection=off"]
-    elif gc_type == "crgc-onblock":
-        gc_args = ["-Duigc.crgc.collection-style=on-block", "-Duigc.engine=crgc"]
-    elif gc_type == "crgc-wave":
-        gc_args = ["-Duigc.crgc.collection-style=wave", "-Duigc.engine=crgc"]
-    else:
-        print(f"Invalid garbage collector type '{gc_type}'. Valid options are: {gc_types}")
-        sys.exit(1)
+    gc_args = get_gc_args(gc_type)
 
     with open(f'{data_dir}/logs/{benchmark}-{gc_type}.log', 'a') as log:
         print(f"Running {short_name(benchmark)} with {gc_type}...", end=" ", flush=True)
         start_time = time.time()
-        subprocess.run(["sbt", "-J-Xmx8G", "-J-XX:+UseZGC"] + gc_args + [f'savina/runMain {classname} -iter {args.iterations} -filename {filename}'], stdout=log, stderr=log)
+        subprocess.run(["sbt"] + savina_jvm_args + gc_args + [f'savina/runMain {classname} -iter {args.iterations} -filename {filename}'], stdout=log, stderr=log)
         end_time = time.time()
         print(f"Finished in {end_time - start_time:.2f} seconds.")
 
@@ -170,34 +176,58 @@ def savina_run_benchmark(benchmark, gc_type, data_dir, args):
 #                     WORKERS                    #
 ##################################################
 
-def mode_to_args(mode):
-    """Converts a mode into a list of arguments to be passed to the JVM."""
-    return [f"-D{key}={value}" for key, value in mode.items()]
+class WorkersRunInfo:
+    def __init__(self, rps, data_dir, mode, gc_type, num_nodes, iterations):
+        self.rps = rps
+        self.data_dir = data_dir
+        self.mode = mode
+        self.gc_type = gc_type
+        self.num_nodes = num_nodes
+        self.iterations = iterations
 
-def workers_run_local(reqs_per_second, output_dir, mode):
-    for gc_type in ["crgc", "mac", "manual"]:
-        filename = f"workers-rps{reqs_per_second}-{gc_type}"
-        with open(f'{output_dir}/{filename}.log', 'w') as log:
-            process = subprocess.Popen(
-                ["sbt", "-J-Xmx2G", "-J-XX:+UseZGC", f"-Duigc.engine={gc_type}", "-Duigc.crgc.num-nodes=1",
-                 f"-Drandom-workers.life-times-file=life-times-{gc_type}.csv",
-                 f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
-                mode_to_args(mode) +
-                [f"runMain randomworkers.RandomWorkers 1 orchestrator 0.0.0.0 0.0.0.0"],
-                stdout=log
-            )
-            # Wait for the orchestrator to terminate
-            process.wait()
+    def log(self, role):
+        return f'{self.data_dir}/logs/workers-{self.rps}-{self.mode}-{self.gc_type}-{role}.log'
 
-def workers_run_cluster(reqs_per_second, data_dir, mode):
-    filename = f"workers-rps-{reqs_per_second}"
+    def jfr(self, role):
+        return f'{self.data_dir}/raw/workers-{self.rps}-{self.mode}-{self.gc_type}-{role}.jfr'
 
+    def lifetimes(self):
+        return f'{self.data_dir}/raw/workers-{self.rps}-{self.mode}-{self.gc_type}-lifetimes.csv'
+
+    def queries(self):
+        return f'{self.data_dir}/raw/workers-{self.rps}-{self.mode}-{self.gc_type}-queries.csv'
+
+    def gc_args(self):
+        return get_gc_args(self.gc_type, self.num_nodes)
+
+    def workers_args(self):
+        return get_mode_args(self.mode) + [
+            f"-Drandom-workers.life-times-file={self.lifetimes()}",
+            f"-Drandom-workers.query-times-file={self.queries()}",
+            f"-Drandom-workers.reqs-per-second={self.rps}",
+            f"-Dbench.iterations={self.iterations}",
+        ]
+
+def workers_run_local(info):
+    with open(info.log("orchestrator"), 'w') as log:
+        process = subprocess.Popen(
+            ["sbt"] +
+            workers_jvm_args +
+            info.gc_args() +
+            info.workers_args() +
+            [f"workers/run 1 orchestrator 0.0.0.0 0.0.0.0"],
+            stdout=log, stderr=log
+        )
+        # Wait for the orchestrator to terminate
+        process.wait()
+
+def workers_run_cluster(info):
     # Add JFR options to SBT opts, saving the old value to be restored later.
     original_sbt_opts = os.environ.get("SBT_OPTS", "")
 
-    with open(f'{data_dir}/logs/{filename}-orchestrator.log', 'w') as log1, \
-         open(f'{data_dir}/logs/{filename}-manager1.log', 'w') as log2, \
-         open(f'{data_dir}/logs/{filename}-manager2.log', 'w') as log3:
+    with open(info.log("orchestrator"), 'w') as log1, \
+         open(info.log("manager1"), 'w') as log2, \
+         open(info.log("manager2"), 'w') as log3:
 
         logs = {
             "orchestrator": log1,
@@ -207,19 +237,16 @@ def workers_run_cluster(reqs_per_second, data_dir, mode):
 
         processes = []
         for role in ["orchestrator", "manager1", "manager2"]:
-            jfr_file = f"{data_dir}/raw/{filename}-{role}.jfr"
-            jfr_settings = 'profile.jfc'
-
             os.environ["SBT_OPTS"] = original_sbt_opts + \
-                 f" -XX:StartFlightRecording=filename={jfr_file},settings={jfr_settings},dumponexit=true"
+                 f" -XX:StartFlightRecording=filename={info.jfr(role)},settings=profile.jfc,dumponexit=true"
 
             process = subprocess.Popen(
-                ["sbt", "-J-Xmx2G", "-J-XX:+UseZGC", "-Duigc.engine=crgc", "-Duigc.crgc.num-nodes=3",
-                 f"-Drandom-workers.reqs-per-second={reqs_per_second}"] +
-                mode_to_args(mode) +
+                ["sbt"] +
+                workers_jvm_args +
+                info.gc_args() +
+                info.workers_args() +
                 [f"workers/run 3 {role} 0.0.0.0 0.0.0.0"],
-                stdout=logs[role],
-                stderr=logs[role]
+                stdout=logs[role], stderr=logs[role]
             )
             processes.append(process)
             time.sleep(5)
@@ -399,13 +426,20 @@ if __name__ == "__main__":
             if args.invocations is None:
                 args.invocations = 6
 
-        # Run the benchmarks
         start_time = time.time()
-        #for i in range(args.invocations):
-        #    for benchmark in savina_benchmarks:
-        #        for gc_type in gc_types:
-        #            savina_run_benchmark(benchmark, gc_type, data_dir, args)
-        workers_run_cluster(200, data_dir, default_mode)
+        # Run the Savina benchmarks
+        for i in range(args.invocations):
+            for benchmark in savina_benchmarks:
+                for gc_type in gc_types:
+                    savina_run_benchmark(benchmark, gc_type, data_dir, args)
+        # Run the Random Workers benchmark
+        for mode in workers_modes:
+            for rps in [200]:
+                for gc_type in ["crgc-onblock"]:
+                    info = WorkersRunInfo(
+                        rps=rps, data_dir=data_dir, mode=mode, gc_type=gc_type, num_nodes=3, iterations=1
+                    )
+                    workers_run_cluster(info)
         end_time = time.time()
         print(f"Finished everything in {(end_time - start_time)/60:.2f} minutes.")
 
