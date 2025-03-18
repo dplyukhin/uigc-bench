@@ -1,4 +1,4 @@
-package common
+package meta
 
 import org.apache.pekko.actor.typed._
 import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}

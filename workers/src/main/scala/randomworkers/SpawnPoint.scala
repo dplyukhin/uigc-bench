@@ -1,6 +1,6 @@
 package randomworkers
 
-import common.{BenchmarkRunner, MetaProtocol, OrchestratorReady}
+import meta.{BenchmarkRunner, MetaProtocol, OrchestratorReady}
 import org.apache.pekko.actor.typed
 import org.apache.pekko.uigc.actor.typed.{RemoteSpawner, unmanaged}
 

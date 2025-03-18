@@ -1,6 +1,6 @@
-package common
+package meta
 
-import common.Orchestrator.OrchestratorServiceKey
+import meta.Orchestrator.OrchestratorServiceKey
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 import org.apache.pekko.actor.typed.receptionist.Receptionist
 import org.apache.pekko.actor.typed.scaladsl.Behaviors

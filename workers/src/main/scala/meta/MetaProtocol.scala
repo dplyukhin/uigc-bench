@@ -1,4 +1,4 @@
-package common
+package meta
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.receptionist.Receptionist
