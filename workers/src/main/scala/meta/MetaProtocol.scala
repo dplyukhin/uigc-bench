@@ -9,9 +9,9 @@ import randomworkers.Protocol
 trait MetaProtocol extends CborSerializable
 
 case class WorkerJoinedMessage(
-  role: String,
-  ref: ActorRef[MetaProtocol],
-  rootActor: ActorRef[RemoteSpawner.Command[Protocol]]
+    role: String,
+    ref: ActorRef[MetaProtocol],
+    rootActor: ActorRef[RemoteSpawner.Command[Protocol]]
 ) extends MetaProtocol
 
 case class ReceptionistListing(listing: Receptionist.Listing) extends MetaProtocol

@@ -12,7 +12,11 @@ private class Random() {
   def genData(size: Int): List[Int] =
     List.tabulate(rng.nextInt(size))(i => i)
 
-  def selectDistinct[T](items: mutable.ArrayBuffer[T], bound: Int, chosen: Set[Any] = Set()): Iterable[T] = {
+  def selectDistinct[T](
+      items: mutable.ArrayBuffer[T],
+      bound: Int,
+      chosen: Set[Any] = Set()
+  ): Iterable[T] = {
     if (items.isEmpty) return Nil
     if (bound == 0) return chosen.asInstanceOf[Iterable[T]]
     val item = select(items)

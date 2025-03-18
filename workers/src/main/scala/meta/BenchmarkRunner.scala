@@ -1,11 +1,7 @@
 package meta
 
-import org.apache.pekko.actor.typed._
-import org.apache.pekko.actor.typed.receptionist.{Receptionist, ServiceKey}
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import com.typesafe.config.{Config, ConfigFactory}
-import org.apache.pekko.uigc.actor.typed.RemoteSpawner
-import randomworkers.{Protocol, SpawnPoint}
+import org.apache.pekko.actor.typed._
 
 import java.io.{BufferedWriter, FileWriter}
 import java.util.concurrent.CountDownLatch
@@ -22,10 +18,10 @@ object BenchmarkRunner {
       )
       System.exit(1)
     } else {
-      val role = args(0)
-      val hostname = args(1)
+      val role       = args(0)
+      val hostname   = args(1)
       val leaderhost = args(2)
-      val numNodes = args(3).toInt
+      val numNodes   = args(3).toInt
 
       if (role == "orchestrator") startup(role, 25251, hostname, leaderhost, numNodes)
       else startup(role, 0, hostname, leaderhost, numNodes)
@@ -50,7 +46,7 @@ object BenchmarkRunner {
       .withFallback(ConfigFactory.load("benchmark"))
       .withFallback(ConfigFactory.load("random-workers"))
 
-    var iterationTimes = Seq[Double]()
+    var iterationTimes   = Seq[Double]()
     val warmupIterations = config.getInt("bench.warmup-iter")
     val normalIterations = config.getInt("bench.iterations")
 
@@ -64,7 +60,7 @@ object BenchmarkRunner {
         doneLatch = new CountDownLatch(1),
         numNodes = numNodes,
         iteration = i,
-        isWarmup = i <= warmupIterations,
+        isWarmup = i <= warmupIterations
       )
       val system =
         if (role == "orchestrator")

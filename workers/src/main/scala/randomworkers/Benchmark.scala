@@ -4,9 +4,8 @@ import org.apache.pekko.uigc.actor.typed._
 import org.apache.pekko.uigc.actor.typed.scaladsl._
 import randomworkers.jfr.AppMsgSerialization
 
+import java.io.{BufferedWriter, FileWriter}
 import scala.collection.mutable
-import java.io.BufferedWriter
-import java.io.FileWriter
 
 object Benchmark {
 
@@ -16,11 +15,14 @@ object Benchmark {
       buf.remove(i)
   }
 
-  private def isRemote(actor: ActorRef[Nothing])(implicit context: ActorContext[Protocol]): Boolean = {
+  private def isRemote(actor: ActorRef[Nothing])(implicit
+      context: ActorContext[Protocol]
+  ): Boolean =
     actor.path.address != context.system.address
-  }
 
-  def sendWorkMsg(recipient : ActorRef[Protocol], work : List[Int])(implicit context: ActorContext[Protocol]) : Unit = {
+  def sendWorkMsg(recipient: ActorRef[Protocol], work: List[Int])(implicit
+      context: ActorContext[Protocol]
+  ): Unit = {
     recipient ! Work(work)
     if (isRemote(recipient)) {
       val metrics = new AppMsgSerialization()
@@ -30,7 +32,9 @@ object Benchmark {
     }
   }
 
-  def sendAcquaintMsg(recipient : ActorRef[Protocol], workers : Seq[ActorRef[Protocol]])(implicit context: ActorContext[Protocol]) : Unit = {
+  def sendAcquaintMsg(recipient: ActorRef[Protocol], workers: Seq[ActorRef[Protocol]])(implicit
+      context: ActorContext[Protocol]
+  ): Unit = {
     recipient ! Acquaint(workers)
     if (isRemote(recipient)) {
       val metrics = new AppMsgSerialization()
@@ -41,11 +45,10 @@ object Benchmark {
   }
 
   // In acyclic mode, we maintain the invariant that owners are always less than their targets.
-  def lessThan(owner: ActorRef[Protocol], target: ActorRef[Protocol]): Boolean = {
+  def lessThan(owner: ActorRef[Protocol], target: ActorRef[Protocol]): Boolean =
     owner.path.toString < target.path.toString
-  }
 
-  def dumpMeasurements(results: String, filename: String): Unit = {
+  def dumpMeasurements(results: String, filename: String): Unit =
     if (filename == null) {
       println("ERROR: Missing filename to dump iteration-specific measurements")
     } else {
@@ -54,6 +57,5 @@ object Benchmark {
       writer.write(results)
       writer.close()
     }
-  }
 
 }
