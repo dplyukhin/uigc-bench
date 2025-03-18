@@ -1,6 +1,6 @@
 package randomworkers
 
-import common.{ClusterBenchmark, ClusterProtocol, OrchestratorDone}
+import common.{ClusterBenchmark, MetaProtocol, OrchestratorDone}
 import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.uigc.actor.typed.{AbstractBehavior, ActorRef, Behavior, RemoteSpawner, unmanaged}
 import randomworkers.Benchmark.{dumpMeasurements, lessThan, remove, sendAcquaintMsg, sendWorkMsg}
@@ -19,7 +19,7 @@ object Manager {
    * It's also responsible for spawning managers at the worker nodes.
    */
   def leadManager(
-                   benchmark: unmanaged.ActorRef[ClusterProtocol[RemoteSpawner.Command[Protocol]]],
+                   benchmark: unmanaged.ActorRef[MetaProtocol],
                    workerNodes: Iterable[unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
                    isWarmup: Boolean
   ): unmanaged.Behavior[Protocol] =
@@ -40,7 +40,7 @@ class Manager(
                ctx: ActorContext[Protocol],
                config: Config,
                workerNodes: Iterable[unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
-               benchmark: unmanaged.ActorRef[ClusterProtocol[RemoteSpawner.Command[Protocol]]],
+               benchmark: unmanaged.ActorRef[MetaProtocol],
                isWarmup: Boolean
 ) extends AbstractBehavior[Protocol](ctx) {
 

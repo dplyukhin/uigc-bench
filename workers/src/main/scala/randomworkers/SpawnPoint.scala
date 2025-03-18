@@ -1,6 +1,6 @@
 package randomworkers
 
-import common.{ClusterBenchmark, ClusterProtocol, OrchestratorReady}
+import common.{ClusterBenchmark, MetaProtocol, OrchestratorReady}
 import org.apache.pekko.actor.typed
 import org.apache.pekko.uigc.actor.typed.{RemoteSpawner, unmanaged}
 
@@ -17,7 +17,7 @@ object SpawnPoint {
    * @param isWarmup Whether this is a warmup run.
    */
   def leader(
-              benchmark: unmanaged.ActorRef[ClusterProtocol[RemoteSpawner.Command[Protocol]]],
+              benchmark: unmanaged.ActorRef[MetaProtocol],
               workerNodes: Map[String, unmanaged.ActorRef[RemoteSpawner.Command[Protocol]]],
               isWarmup: Boolean
   ): unmanaged.Behavior[RemoteSpawner.Command[Protocol]] =

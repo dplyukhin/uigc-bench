@@ -11,20 +11,6 @@ import java.io.FileWriter
 
 object Benchmark {
 
-  def main(args: Array[String]): Unit = {
-    // Each node has a manager that spawns workers and sends them work.
-    // Here we create the benchmark, passing in behaviors for the "leader" manager and for the "follower" managers (if they exist.)
-    val bench = ClusterBenchmark[RemoteSpawner.Command[Protocol]](
-      SpawnPoint.leader,
-      Map(
-        // FIXME Add a flag so I don't have to comment this out manually
-        "manager1" -> SpawnPoint.follower(),
-        "manager2" -> SpawnPoint.follower()
-      )
-    )
-    bench.runBenchmark(args)
-  }
-
   def remove(ref: ActorRef[Protocol], buf: mutable.ArrayBuffer[ActorRef[Protocol]]): Unit = {
     val i = buf.indexOf(ref)
     if (i != -1)
