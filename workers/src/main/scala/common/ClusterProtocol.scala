@@ -8,7 +8,7 @@ trait ClusterProtocol[T] extends CborSerializable
 case class WorkerJoinedMessage[T](
                                    role: String,
                                    ref: ActorRef[ClusterProtocol[T]],
-                                   actors: Map[String, ActorRef[T]]
+                                   rootActor: ActorRef[T]
                                  ) extends ClusterProtocol[T]
 case class ReceptionistListing[T](listing: Receptionist.Listing) extends ClusterProtocol[T]
 case class OrchestratorReady[T]() extends ClusterProtocol[T]

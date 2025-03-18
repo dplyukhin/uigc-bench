@@ -20,20 +20,9 @@ object ClusterBenchmark {
       ) => Behavior[T],
       workerBehaviors: Map[String, Behavior[T]]
   ): ClusterBenchmark[T] = {
-    val workerBehaviors2 =
-      for ((name, behavior) <- workerBehaviors) yield name -> Map(name -> behavior)
-    def orchestratorBehavior2(
-                               parentRef: ActorRef[ClusterProtocol[T]],
-                               workerNodes: Map[String, Map[String, ActorRef[T]]],
-                               isWarmup: Boolean
-    ): Behavior[T] = {
-      val workerRefs =
-        for ((_, map) <- workerNodes; (name, ref) <- map) yield name -> ref
-      orchestratorBehavior(parentRef, workerRefs, isWarmup)
-    }
     new ClusterBenchmark(
-      orchestratorBehavior2,
-      workerBehaviors2
+      orchestratorBehavior,
+      workerBehaviors
     )
   }
 
@@ -54,10 +43,10 @@ object ClusterBenchmark {
 class ClusterBenchmark[T](
     orchestratorBehavior: (
         ActorRef[ClusterProtocol[T]],
-        Map[String, Map[String, ActorRef[T]]],
+        Map[String, ActorRef[T]],
         Boolean
     ) => Behavior[T],
-    workerBehaviors: Map[String, Map[String, Behavior[T]]]
+    workerBehaviors: Map[String, Behavior[T]]
 ) {
 
   import ClusterBenchmark._
@@ -176,7 +165,7 @@ class ClusterBenchmark[T](
       */
     private def waitForWorkerNodes(
                                     workerNodes: Map[String, ActorRef[ClusterProtocol[T]]],
-                                    workerActors: Map[String, Map[String, ActorRef[T]]],
+                                    workerActors: Map[String, ActorRef[T]],
                                     iteration: Int,
                                     readyLatch: CountDownLatch,
                                     doneLatch: CountDownLatch,
@@ -184,9 +173,9 @@ class ClusterBenchmark[T](
     ): Behavior[ClusterProtocol[T]] =
       Behaviors.receive { (ctx, msg) =>
         msg match {
-          case WorkerJoinedMessage(role, node, actors) =>
+          case WorkerJoinedMessage(role, node, rootActor) =>
             val newWorkerNodes = workerNodes + (role -> node)
-            val newWorkerActors = workerActors + (role -> actors)
+            val newWorkerActors = workerActors + (role -> rootActor)
             if (newWorkerNodes.size < numWorkers)
               waitForWorkerNodes(newWorkerNodes, newWorkerActors, iteration, readyLatch, doneLatch, isWarmup)
             else {
@@ -243,16 +232,15 @@ class ClusterBenchmark[T](
     ): Behavior[ClusterProtocol[T]] = Behaviors.setup[ClusterProtocol[T]] { ctx =>
       val adapter = ctx.messageAdapter[Receptionist.Listing](ReceptionistListing.apply)
       ctx.system.receptionist ! Receptionist.Subscribe(OrchestratorServiceKey, adapter)
-      val workers =
-        for ((name, worker) <- workerBehaviors(role)) yield name -> ctx.spawnAnonymous(worker)
+      val rootActor = ctx.spawnAnonymous(workerBehaviors(role))
       readyLatch.countDown()
-      waitForOrchestrator(role, workers, doneLatch)
+      waitForOrchestrator(role, rootActor, doneLatch)
     }
 
     /** Worker node waits to receive a reference to the orchestrator node. */
     private def waitForOrchestrator(
         role: String,
-        workers: Map[String, ActorRef[T]],
+        rootActor: ActorRef[T],
         doneLatch: CountDownLatch
     ): Behavior[ClusterProtocol[T]] =
       Behaviors.receive { (ctx, msg) =>
@@ -260,10 +248,10 @@ class ClusterBenchmark[T](
           case ReceptionistListing(OrchestratorServiceKey.Listing(listings)) =>
             listings.find(_ => true) match {
               case Some(orchestratorNode) =>
-                orchestratorNode ! WorkerJoinedMessage(role, ctx.self, workers)
+                orchestratorNode ! WorkerJoinedMessage(role, ctx.self, rootActor)
                 prepareForTermination(doneLatch)
               case None =>
-                waitForOrchestrator(role, workers, doneLatch)
+                waitForOrchestrator(role, rootActor, doneLatch)
             }
         }
       }
