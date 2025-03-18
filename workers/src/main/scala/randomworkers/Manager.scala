@@ -1,6 +1,6 @@
 package randomworkers
 
-import common.{ClusterBenchmark, MetaProtocol, OrchestratorDone}
+import common.{BenchmarkRunner, MetaProtocol, OrchestratorDone}
 import org.apache.pekko.uigc.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.uigc.actor.typed.{AbstractBehavior, ActorRef, Behavior, RemoteSpawner, unmanaged}
 import randomworkers.Benchmark.{dumpMeasurements, lessThan, remove, sendAcquaintMsg, sendWorkMsg}

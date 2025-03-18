@@ -1,6 +1,6 @@
 package randomworkers
 
-import common.ClusterBenchmark
+import common.BenchmarkRunner
 import org.apache.pekko.uigc.actor.typed._
 import org.apache.pekko.uigc.actor.typed.scaladsl._
 import randomworkers.jfr.AppMsgSerialization
