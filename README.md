@@ -17,8 +17,10 @@ The "quick" evaluation takes about 30 minutes. Here's how to run it:
 ./savina.py quick
 ```
 
-The "quick" evaluation only runs a subset of the Savina benchmarks. Each benchmark
-only runs for ten iterations and just one JVM invocation. The raw data will be
+The "quick" evaluation only runs a subset of the Savina benchmarks. Each 
+benchmark only runs for ten iterations and just one JVM invocation. You 
+can customize the number of iterations and JVM invocations with the 
+`--iter` and `--invocations` flags, respectively. The raw data will be 
 written to the `data/` directory.
 
 ## Viewing Results
@@ -30,7 +32,7 @@ To display the results as an ASCII table, run the following command.
 ```
 
 If you ran the evaluation multiple times, the command lets you choose which 
-"run" to look at.
+"run" to look at. 
 
 ## Full Evaluation
 
