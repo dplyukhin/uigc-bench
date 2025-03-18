@@ -144,9 +144,9 @@ def run_benchmark(benchmark, gc_type, data_dir, args):
         sys.exit(1)
 
     with open(f'{data_dir}/logs/{benchmark}-{gc_type}.log', 'a') as log:
-        print(f"Running {benchmark} with {gc_type} garbage collector...", end=" ", flush=True)
+        print(f"Running {shorten_benchmark_name(benchmark)} with {gc_type}...", end=" ", flush=True)
         start_time = time.time()
-        subprocess.run(["sbt", "-J-Xmx16G", "-J-XX:+UseZGC"] + gc_args + [f'runMain {classname} -iter {args.iter} -filename {filename}'], stdout=log, stderr=log)
+        subprocess.run(["sbt", "-J-Xmx8G", "-J-XX:+UseZGC"] + gc_args + [f'runMain {classname} -iter {args.iter} -filename {filename}'], stdout=log, stderr=log)
         end_time = time.time()
         print(f"Finished in {end_time - start_time:.2f} seconds.")
 
@@ -230,15 +230,15 @@ def display_data(data_dir):
 
             percent_stdev = int(nogc_std / nogc_avg * 100)
             df = pd.DataFrame({
-                "Benchmark":      [shorten_benchmark_name(bm)],
-                "no GC":          [sigfigs(nogc_avg / 1000, 2)],
-                "WRC":            [sigfigs(wrc_avg / 1000, 2)],
-                "CRGC-block":     [sigfigs(onblk_avg / 1000, 2)],
-                "CRGC-wave":      [sigfigs(wave_avg / 1000, 2)],
-                "no GC (stdev)":  ["±" + str(percent_stdev)],
-                "WRC (%)":        [int((wrc_avg / nogc_avg - 1) * 100)],
-                "CRGC-block (%)": [int((onblk_avg / nogc_avg - 1) * 100)],
-                "CRGC-wave (%)":  [int((wave_avg / nogc_avg - 1) * 100)],
+                "Benchmark":        [shorten_benchmark_name(bm)],
+                "no GC":            [sigfigs(nogc_avg / 1000, 2)],
+                "WRC":              [sigfigs(wrc_avg / 1000, 2)],
+                "CRGC-block":       [sigfigs(onblk_avg / 1000, 2)],
+                "CRGC-wave":        [sigfigs(wave_avg / 1000, 2)],
+                "no GC (stdev %)":  ["±" + str(percent_stdev)],
+                "WRC (%)":          [int((wrc_avg / nogc_avg - 1) * 100)],
+                "CRGC-block (%)":   [int((onblk_avg / nogc_avg - 1) * 100)],
+                "CRGC-wave (%)":    [int((wave_avg / nogc_avg - 1) * 100)],
             })
             if bm in microBenchmarks:
                 micro_df = pd.concat([micro_df, df], ignore_index=True)
@@ -255,11 +255,11 @@ def display_data(data_dir):
         print(f"Missing data for the following benchmarks: {missing_data}")
 
     print("Microbenchmarks:")
-    print(micro_df.to_markdown(tablefmt="rounded_grid", index=False, headers=df.columns))
+    print(micro_df.to_markdown(tablefmt="rounded_grid", index=False))
     print("\nConcurrency benchmarks:")
-    print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False, headers=df.columns))
+    print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False))
     print("\nParallel benchmarks:")
-    print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False, headers=df.columns))
+    print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False))
 
 
 ############################## MAIN ##############################
@@ -268,19 +268,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=["quick", "full", "process"],
+        choices=["quick", "full", "view"],
         help="Which command to run."
     )
     parser.add_argument(
         "--iter",
         type=int,
-        default=20,
+        default=None,
         help="Number of times to run each benchmark PER JVM INVOCATION."
     )
     parser.add_argument(
         "--invocations",
         type=int,
-        default=6,
+        default=None,
         help="Number of JVM invocations to run for each benchmark."
     )
     args = parser.parse_args()
@@ -305,19 +305,32 @@ if __name__ == "__main__":
         benchmarks = []
         if args.command == "quick":
             benchmarks = quick_benchmarks
+            if args.iter is None:
+                args.iter = 10
+            if args.invocations is None:
+                args.invocations = 1
         elif args.command == "full":
             benchmarks = benchmark_names.keys()
+            if args.iter is None:
+                args.iter = 20
+            if args.invocations is None:
+                args.invocations = 6
 
         # Run the benchmarks
+        start_time = time.time()
         for i in range(args.invocations):
             for benchmark in benchmarks:
                 for gc_type in gc_types:
                     run_benchmark(benchmark, gc_type, data_dir, args)
+        end_time = time.time()
+        print(f"Finished everything in {(end_time - start_time)/60:.2f} minutes.")
 
-    elif args.command == "process":
+    elif args.command == "view":
         # Get a list of directories in the data folder
         directories = [d for d in os.listdir("data") if os.path.isdir(f"data/{d}")]
-        directories.sort()
+        # Sort the directories by modification time
+        directories.sort(key=lambda x: os.path.getmtime(f"data/{x}"))
+
         if len(directories) == 0:
             print("No data found in the `data/` directory.")
             sys.exit(1)
