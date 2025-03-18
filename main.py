@@ -203,7 +203,7 @@ def workers_run_cluster(reqs_per_second, output_dir, mode):
             jfr_settings = 'profile.jfc'
 
             os.environ["SBT_OPTS"] = original_sbt_opts + \
-                                     f" -XX:StartFlightRecording=filename={jfr_file},settings={jfr_settings},dumponexit=true"
+                 f" -XX:StartFlightRecording=filename={jfr_file},settings={jfr_settings},dumponexit=true"
 
             print(f"Starting {role}")
             process = subprocess.Popen(
@@ -229,9 +229,7 @@ def workers_run_cluster(reqs_per_second, output_dir, mode):
 ################################################################################
 
 def get_time_stats(benchmark, data_dir, gc_type):
-    """
-    Read the CSV file and return the average and standard deviation.
-    """
+    """Read the CSV file and return the average and standard deviation."""
     filename = raw_time_filename(benchmark, data_dir, gc_type)
     with open(filename) as file:
         lines = [float(line) for line in file]
@@ -249,9 +247,7 @@ def short_name(benchmark):
     return benchmark.split(".")[0]
 
 def sigfigs(x, n):
-    """
-    Round x to n significant figures.
-    """
+    """Round x to n significant figures."""
     y = round(x, n - int(np.floor(np.log10(abs(x)))) - 1)
     return int(y) if y.is_integer() else y
 
@@ -302,20 +298,20 @@ def savina_display_data(data_dir):
 #                     WORKERS                    #
 ##################################################
 
-def read_numbers_from_file(filename):
+def workers_get_data(filename):
     with open(filename, 'r') as f:
         numbers = [float(line.strip()) for line in f if line.strip()]
     return numbers
 
-def compute_cdf(data):
+def workers_compute_cdf(data):
     sorted_data = np.sort(data)
     cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
     return sorted_data, cdf
 
-def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='No GC'):
-    x1, cdf1 = compute_cdf(data1)
-    x2, cdf2 = compute_cdf(data2)
-    x3, cdf3 = compute_cdf(data3)
+def workers_plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='No GC'):
+    x1, cdf1 = workers_compute_cdf(data1)
+    x2, cdf2 = workers_compute_cdf(data2)
+    x3, cdf3 = workers_compute_cdf(data3)
 
     plt.figure(figsize=(4, 2))
     step = 10000
@@ -330,15 +326,15 @@ def plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='No GC'):
     plt.grid(True)
     plt.show()
 
-def plot():
-    file1_data = read_numbers_from_file("life-times-cyclic-crgc.csv")
-    file2_data = read_numbers_from_file("life-times-cyclic-mac.csv")
-    file3_data = read_numbers_from_file("life-times-cyclic-manual.csv")
-    plot_cdf(file1_data, file2_data, file3_data)
-    file1_data = read_numbers_from_file("life-times-acyclic-crgc.csv")
-    file2_data = read_numbers_from_file("life-times-acyclic-mac.csv")
-    file3_data = read_numbers_from_file("life-times-acyclic-manual.csv")
-    plot_cdf(file1_data, file2_data, file3_data)
+def workers_plot():
+    file1_data = workers_get_data("life-times-cyclic-crgc.csv")
+    file2_data = workers_get_data("life-times-cyclic-mac.csv")
+    file3_data = workers_get_data("life-times-cyclic-manual.csv")
+    workers_plot_cdf(file1_data, file2_data, file3_data)
+    file1_data = workers_get_data("life-times-acyclic-crgc.csv")
+    file2_data = workers_get_data("life-times-acyclic-mac.csv")
+    file3_data = workers_get_data("life-times-acyclic-manual.csv")
+    workers_plot_cdf(file1_data, file2_data, file3_data)
 
 
 ############################## MAIN ##############################
@@ -381,15 +377,15 @@ if __name__ == "__main__":
             sys.exit(1)
 
         # Set the benchmarks
-        benchmarks = []
+        savina_benchmarks = []
         if args.command == "quick":
-            benchmarks = savina_quick_benchmarks
+            savina_benchmarks = savina_quick_benchmarks
             if args.iterations is None:
                 args.iterations = 10
             if args.invocations is None:
                 args.invocations = 1
         elif args.command == "full":
-            benchmarks = savina_all_benchmarks
+            savina_benchmarks = savina_all_benchmarks
             if args.iterations is None:
                 args.iterations = 20
             if args.invocations is None:
@@ -398,7 +394,7 @@ if __name__ == "__main__":
         # Run the benchmarks
         start_time = time.time()
         for i in range(args.invocations):
-            for benchmark in benchmarks:
+            for benchmark in savina_benchmarks:
                 for gc_type in gc_types:
                     savina_run_benchmark(benchmark, gc_type, data_dir, args)
         end_time = time.time()
