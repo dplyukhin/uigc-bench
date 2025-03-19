@@ -26,6 +26,11 @@ gc_types = ["nogc", "wrc", "crgc-onblock", "crgc-wave"]
 
 savina_jvm_args = ["-J-Xmx8G", "-J-XX:+UseZGC"]
 
+# List of Savina benchmarks to run in the "kick the tires" mode.
+savina_kick_benchmarks = [
+    "fib.FibonacciAkkaGCActorBenchmark",
+]
+
 # List of Savina benchmarks to run in the "quick" evaluation.
 # Benchmarks that take more than a second to run are excluded.
 savina_quick_benchmarks = [
@@ -346,15 +351,7 @@ def savina_display_data(data_dir):
             missing_data.append(bm)
             continue
 
-    if not micro_df.empty:
-        print("\nMicrobenchmarks:")
-        print(micro_df.to_markdown(tablefmt="rounded_grid", index=False))
-    if not concurrency_df.empty:
-        print("\nConcurrency benchmarks:")
-        print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False))
-    if not parallel_df.empty:
-        print("\nParallel benchmarks:")
-        print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False))
+    return micro_df, concurrency_df, parallel_df
 
 ##################################################
 #                     WORKERS                    #
@@ -381,6 +378,10 @@ def workers_process_data(info):
     for role in ["orchestrator", "manager1", "manager2"]:
         jfr_file = info.jfr(role)
         json_file = info.json(role)
+
+        if not os.path.exists(jfr_file):
+            raise FileNotFoundError(f"JFR file not found: {jfr_file}")
+
         subprocess.run(f"jfr print --categories 'UIGC' --json {jfr_file} > {json_file}", shell=True)
 
         with open(json_file, 'r') as f:
@@ -419,22 +420,20 @@ def workers_process_data(info):
     return df
 
 def workers_display_data(data_dir):
-    frames = []
+    df = pd.DataFrame()
     for mode in workers_modes:
         for rps in [200]:
             for gc_type in ["crgc-onblock"]:
                 info = WorkersRunInfo(
                     rps=rps, data_dir=data_dir, mode=mode, gc_type=gc_type, num_nodes=3, iterations=1
                 )
-                frame = workers_process_data(info)
-                frames.append(frame)
+                try:
+                    frame = workers_process_data(info)
+                    df = pd.concat([df, frame], ignore_index=True)
+                except:
+                    continue
 
-    df = pd.concat(frames, ignore_index=True)
-
-    if not df.empty:
-        print("\nRandom Workers Bandwidth:")
-        print(df.to_markdown(tablefmt="rounded_grid", index=False))
-
+    return df
 
 def workers_get_data(filename):
     with open(filename, 'r') as f:
@@ -481,7 +480,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=["quick", "full", "view"],
+        choices=["kick", "quick", "full", "view"],
         help="Which command to run."
     )
     parser.add_argument(
@@ -496,11 +495,17 @@ if __name__ == "__main__":
         default=None,
         help="Number of JVM invocations to run for each benchmark."
     )
+    parser.add_argument(
+        "--rw-modes",
+        type=str,
+        default=None,
+        help="List of Random Workers modes to run, as a comma-separated list. Options are 'torture-small', 'torture-large', or 'streaming'.",
+    )
     args = parser.parse_args()
 
     os.makedirs('data', exist_ok=True)
 
-    if args.command in ["quick", "full"]:
+    if args.command in ["kick", "quick", "full"]:
         # Current time in the form YYYY-MM-DD-HH-MM-SS
         timestamp = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
         data_dir = f"data/{timestamp}"
@@ -516,27 +521,39 @@ if __name__ == "__main__":
 
         # Set the benchmarks
         savina_benchmarks = []
-        if args.command == "quick":
+        if args.command == "kick":
+            savina_benchmarks = savina_kick_benchmarks
+            if args.iterations is None:
+                args.iterations = 5
+            if args.invocations is None:
+                args.invocations = 1
+            if args.rw_modes is None:
+                args.rw_modes = "streaming"
+        elif args.command == "quick":
             savina_benchmarks = savina_quick_benchmarks
             if args.iterations is None:
                 args.iterations = 10
             if args.invocations is None:
                 args.invocations = 1
+            if args.rw_modes is None:
+                args.rw_modes = "torture-small,torture-large,streaming"
         elif args.command == "full":
             savina_benchmarks = savina_all_benchmarks
             if args.iterations is None:
                 args.iterations = 20
             if args.invocations is None:
                 args.invocations = 6
+            if args.rw_modes is None:
+                args.rw_modes = "torture-small,torture-large,streaming"
 
         start_time = time.time()
-        # # Run the Savina benchmarks
-        # for i in range(args.invocations):
-        #     for benchmark in savina_benchmarks:
-        #         for gc_type in gc_types:
-        #             savina_run_benchmark(benchmark, gc_type, data_dir, args)
+        # Run the Savina benchmarks
+        for i in range(args.invocations):
+            for benchmark in savina_benchmarks:
+                for gc_type in gc_types:
+                    savina_run_benchmark(benchmark, gc_type, data_dir, args)
         # Run the Random Workers benchmark
-        for mode in workers_modes:
+        for mode in args.rw_modes.split(","):
             for rps in [200]:
                 for gc_type in ["crgc-onblock"]:
                     info = WorkersRunInfo(
@@ -579,8 +596,21 @@ if __name__ == "__main__":
                 except ValueError:
                     print("Invalid choice. Please enter a number or press Enter.")
 
-        savina_display_data(data_dir)
-        workers_display_data(data_dir)
+        micro_df, concurrency_df, parallel_df = savina_display_data(data_dir)
+        rw_df = workers_display_data(data_dir)
+
+        if not micro_df.empty:
+            print("\nSavina Microbenchmarks:")
+            print(micro_df.to_markdown(tablefmt="rounded_grid", index=False))
+        if not concurrency_df.empty:
+            print("\nSavina Concurrency Benchmarks:")
+            print(concurrency_df.to_markdown(tablefmt="rounded_grid", index=False))
+        if not parallel_df.empty:
+            print("\nSavina Parallel Benchmarks:")
+            print(parallel_df.to_markdown(tablefmt="rounded_grid", index=False))
+        if not rw_df.empty:
+            print("\nRandom Workers Bandwidth:")
+            print(rw_df.to_markdown(tablefmt="rounded_grid", index=False))
 
     else:
         parser.print_help()
