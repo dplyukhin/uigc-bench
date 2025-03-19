@@ -140,7 +140,7 @@ def get_gc_args(gc_type, num_nodes=1):
     if gc_type == "nogc":
         return ["-Duigc.engine=manual"]
     elif gc_type == "wrc":
-        return ["-Duigc.engine=mac", "-Duigc.mac.cycle-detection=off"]
+        return ["-Duigc.engine=wrc"]
     elif gc_type == "crgc-onblock":
         return ["-Duigc.engine=crgc", f"-Duigc.crgc.num-nodes={num_nodes}", "-Duigc.crgc.collection-style=on-block"]
     elif gc_type == "crgc-wave":
@@ -434,44 +434,6 @@ def workers_display_data(data_dir):
                     continue
 
     return df
-
-def workers_get_data(filename):
-    with open(filename, 'r') as f:
-        numbers = [float(line.strip()) for line in f if line.strip()]
-    return numbers
-
-def workers_compute_cdf(data):
-    sorted_data = np.sort(data)
-    cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
-    return sorted_data, cdf
-
-def workers_plot_cdf(data1, data2, data3, label1='CRGC', label2='WRC', label3='No GC'):
-    x1, cdf1 = workers_compute_cdf(data1)
-    x2, cdf2 = workers_compute_cdf(data2)
-    x3, cdf3 = workers_compute_cdf(data3)
-
-    plt.figure(figsize=(4, 2))
-    step = 10000
-    plt.plot(x1[::step], cdf1[::step], label=label1, marker='o', linestyle='-', alpha=0.7)
-    plt.plot(x2[::step], cdf2[::step], label=label2, marker='s', linestyle='-', alpha=0.7)
-    plt.plot(x3[::step], cdf3[::step], label=label3, marker='d', linestyle='-', alpha=0.7)
-
-    plt.xlim([0, 1500])
-
-    plt.xlabel('Actor life time (ms)')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def workers_plot():
-    file1_data = workers_get_data("life-times-cyclic-crgc.csv")
-    file2_data = workers_get_data("life-times-cyclic-mac.csv")
-    file3_data = workers_get_data("life-times-cyclic-manual.csv")
-    workers_plot_cdf(file1_data, file2_data, file3_data)
-    file1_data = workers_get_data("life-times-acyclic-crgc.csv")
-    file2_data = workers_get_data("life-times-acyclic-mac.csv")
-    file3_data = workers_get_data("life-times-acyclic-manual.csv")
-    workers_plot_cdf(file1_data, file2_data, file3_data)
 
 
 ############################## MAIN ##############################
