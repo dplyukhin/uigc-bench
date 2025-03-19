@@ -397,12 +397,24 @@ def workers_process_data(info):
 
         os.remove(json_file)
 
+    total = app + refs + shadows + ingress
+
+    app_bytes = bytes_to_str(app)
+    refs_bytes = bytes_to_str(refs)
+    shadows_bytes = bytes_to_str(shadows)
+    ingress_bytes = bytes_to_str(ingress)
+
+    app_ratio = (app / total) * 100
+    refs_ratio = (refs / total) * 100
+    shadows_ratio = (shadows / total) * 100
+    ingress_ratio = (ingress / total) * 100
+
     df = pd.DataFrame({
         "Mode":             [info.mode],
-        "Application data": [bytes_to_str(app)],
-        "Actor references": [bytes_to_str(refs)],
-        "Shadows":          [bytes_to_str(shadows)],
-        "Ingress entries":  [bytes_to_str(ingress)],
+        "Application data": [f"{app_bytes} ({app_ratio:.2f}%)"],
+        "Actor references": [f"{refs_bytes} ({refs_ratio:.2f}%)"],
+        "Shadows":          [f"{shadows_bytes} ({shadows_ratio:.2f}%)"],
+        "Ingress entries":  [f"{ingress_bytes} ({ingress_ratio:.2f}%)"],
     })
     return df
 
@@ -518,11 +530,11 @@ if __name__ == "__main__":
                 args.invocations = 6
 
         start_time = time.time()
-        # Run the Savina benchmarks
-        for i in range(args.invocations):
-            for benchmark in savina_benchmarks:
-                for gc_type in gc_types:
-                    savina_run_benchmark(benchmark, gc_type, data_dir, args)
+        # # Run the Savina benchmarks
+        # for i in range(args.invocations):
+        #     for benchmark in savina_benchmarks:
+        #         for gc_type in gc_types:
+        #             savina_run_benchmark(benchmark, gc_type, data_dir, args)
         # Run the Random Workers benchmark
         for mode in workers_modes:
             for rps in [200]:
